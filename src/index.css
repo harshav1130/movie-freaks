@@ -1,0 +1,24 @@
+/* src/index.css */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  /* Reset default colors */
+  background-color: #000;
+  color: #fff;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw; /* Force full viewport width */
+  min-height: 100vh;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* IMPORTANT: This ensures the React root div takes up full space */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}

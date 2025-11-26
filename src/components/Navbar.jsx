@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FaSearch, FaBars, FaTimes, FaUserCircle, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 
 const Navbar = ({ user, onLogout, onOpenSettings, searchData, onResultClick }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,8 +39,12 @@ const Navbar = ({ user, onLogout, onOpenSettings, searchData, onResultClick }) =
           <li><a href="#mylist">My List</a></li>
 
           {user.role === 'admin' && (
-             <li><a href="/admin" style={{ color: 'var(--mf-red)', fontWeight: 'bold' }}>Admin Panel</a></li>
-          )}
+   <li>
+       <Link to="/admin" style={{ color: 'var(--mf-red)', fontWeight: 'bold', textDecoration: 'none' }}>
+           Admin Panel
+       </Link>
+   </li>
+)}
         </ul>
       </nav>
 

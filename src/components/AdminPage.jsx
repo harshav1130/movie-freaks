@@ -1,77 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaEdit, FaPlus, FaSearch, FaUpload, FaImage, FaArrowLeft, FaTrash, FaStar, FaChartBar } from 'react-icons/fa';
-import { API_URL } from '../config'; // 👈 IMPORT API_URL (Note the ../ because we are in components folder)
+import { FaEdit, FaPlus, FaSearch, FaUpload, FaImage, FaArrowLeft, FaTrash, FaStar, FaChartBar, FaTimes } from 'react-icons/fa';
+import { API_URL } from '../config'; // 👈 IMPORT API_URL
 
 const GENRES = ["Action", "Sci-Fi", "Drama", "Comedy", "Horror", "Thriller", "Romance", "Animation", "Fantasy", "Adventure"];
 
 const AdminPage = () => {
   const navigate = useNavigate();
-  
   const [activeTab, setActiveTab] = useState('manage');
   const [contentList, setContentList] = useState([]);
   const [carouselList, setCarouselList] = useState([]);
   const [analytics, setAnalytics] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Forms
+  const [uploading, setUploading] = useState(false);
+
+  // --- ADD FORM STATE ---
   const [addFormData, setAddFormData] = useState({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [files, setFiles] = useState({ image: null, video: null, trailer: null });
   
-  // Banner Form
-  const [bannerForm, setBannerForm] = useState({ title: '', description: '', tag: 'Featured', videoUrl: '' });
-  const [bannerImageFile, setBannerImageFile] = useState(null);
-  const [bannerVideoFile, setBannerVideoFile] = useState(null);
-  
-  // Edit State
+  // --- EDIT CONTENT STATE ---
   const [editingItem, setEditingItem] = useState(null);
   const [episodeForm, setEpisodeForm] = useState({ seasonName: 'Season 1', title: '', duration: '' });
   const [seasonPosterForm, setSeasonPosterForm] = useState({ seasonName: 'Season 1' });
-  const [uploading, setUploading] = useState(false);
+
+  // --- BANNER STATE (Add & Edit) ---
+  const [bannerForm, setBannerForm] = useState({ title: '', description: '', tag: 'Featured', videoUrl: '' });
+  const [bannerImageFile, setBannerImageFile] = useState(null);
+  const [bannerVideoFile, setBannerVideoFile] = useState(null);
   const [editingBanner, setEditingBanner] = useState(null);
 
   useEffect(() => { fetchAll(); fetchCarousel(); fetchAnalytics(); }, []);
 
   const fetchAll = async () => {
       try {
-        // 👇 UPDATED: Use API_URL
         const [m, s, a] = await Promise.all([
             fetch(`${API_URL}/api/movies`).then(r => r.json()),
             fetch(`${API_URL}/api/series`).then(r => r.json()),
             fetch(`${API_URL}/api/anime`).then(r => r.json())
         ]);
-        setContentList([...m, ...s, ...a]);
-      } catch (e) { console.error(e); }
+        // Ensure arrays are valid before merging
+        setContentList([...(m || []), ...(s || []), ...(a || [])]);
+      } catch (e) { console.error("Fetch Error:", e); }
   };
-
+  
   const fetchCarousel = async () => {
       try {
-        // 👇 UPDATED: Use API_URL
         const res = await fetch(`${API_URL}/api/carousel`);
-        setCarouselList(await res.json());
+        const data = await res.json();
+        setCarouselList(data || []);
       } catch (e) { console.error(e); }
   };
 
   const fetchAnalytics = async () => {
       try {
-          // 👇 UPDATED: Use API_URL
           const res = await fetch(`${API_URL}/api/admin/analytics`);
-          setAnalytics(await res.json());
+          const data = await res.json();
+          setAnalytics(data || []);
       } catch(e) { console.error(e); }
   };
 
   // --- HANDLERS ---
+
   const handleGenreToggle = (genre) => {
       if (selectedGenres.includes(genre)) setSelectedGenres(selectedGenres.filter(g => g !== genre));
       else setSelectedGenres([...selectedGenres, genre]);
-  };
-
-  const handleDelete = async (id) => {
-      if(!confirm("Permanently Delete this content?")) return;
-      // 👇 UPDATED: Use API_URL
-      await fetch(`${API_URL}/api/admin/delete/${id}`, { method: 'DELETE' });
-      fetchAll();
   };
 
   const handleAddSubmit = async (e) => {
@@ -84,53 +77,48 @@ const AdminPage = () => {
     if (files.trailer) data.append('trailerFile', files.trailer);
 
     try {
-        // 👇 UPDATED: Use API_URL
         const res = await fetch(`${API_URL}/api/admin/add`, { method: 'POST', body: data });
         if (res.ok) {
             alert("✅ Content Uploaded!");
-            
-            // Auto-Redirect Logic
-            let endpoint = '';
-            // 👇 UPDATED: Use API_URL
-            if(addFormData.category === 'movie') endpoint = `${API_URL}/api/movies`;
-            else if(addFormData.category === 'series') endpoint = `${API_URL}/api/series`;
-            else endpoint = `${API_URL}/api/anime`;
-
-            const freshList = await fetch(endpoint).then(r => r.json());
-            const newItem = freshList.find(i => i.title === addFormData.title);
-
+            fetchAll(); setActiveTab('manage');
             setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
             setSelectedGenres([]); setFiles({ image: null, video: null, trailer: null });
             document.querySelectorAll('input[type="file"]').forEach(i => i.value = '');
-            fetchAll(); setActiveTab('manage');
-            if(newItem) setEditingItem(newItem);
         } else alert("Failed.");
     } catch (err) { alert("Error"); } finally { setUploading(false); }
   };
 
   const handleBannerSubmit = async (e) => {
-      e.preventDefault(); setUploading(true);
+      e.preventDefault(); 
+      setUploading(true);
+      
       const data = new FormData();
-      data.append('title', bannerForm.title); data.append('description', bannerForm.description);
-      data.append('tag', bannerForm.tag); data.append('videoUrl', bannerForm.videoUrl);
+      data.append('title', bannerForm.title); 
+      data.append('description', bannerForm.description);
+      data.append('tag', bannerForm.tag); 
+      data.append('videoUrl', bannerForm.videoUrl);
+      
       if (bannerImageFile) data.append('imageFile', bannerImageFile);
       if (bannerVideoFile) data.append('videoFile', bannerVideoFile);
 
       try {
-        // 👇 UPDATED: Use API_URL
         let url = `${API_URL}/api/admin/carousel/add`;
         let method = 'POST';
+
         if (editingBanner) {
             url = `${API_URL}/api/admin/carousel/update/${editingBanner.id}`;
             method = 'PUT';
         }
+
         const res = await fetch(url, { method: method, body: data });
         if(res.ok) { 
             alert(editingBanner ? "✅ Banner Updated!" : "✅ Banner Added!"); 
             setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' });
             setBannerImageFile(null); setBannerVideoFile(null);
-            setEditingBanner(null);
-            document.getElementById('bannerImgInput').value = ''; 
+            setEditingBanner(null); 
+            const fileInput = document.getElementById('bannerImgInput');
+            if(fileInput) fileInput.value = '';
+            
             fetchCarousel(); 
         }
         else alert("Failed");
@@ -140,9 +128,15 @@ const AdminPage = () => {
 
   const startEditBanner = (item) => {
       setEditingBanner(item);
-      setBannerForm({ title: item.title, description: item.description, tag: item.tag, videoUrl: item.videoUrl });
+      setBannerForm({
+          title: item.title,
+          description: item.description,
+          tag: item.tag,
+          videoUrl: item.videoUrl
+      });
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
   const cancelEditBanner = () => {
       setEditingBanner(null);
       setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' });
@@ -150,59 +144,20 @@ const AdminPage = () => {
 
   const handleDeleteBanner = async (id) => {
       if(!confirm("Delete this banner?")) return;
-      // 👇 UPDATED: Use API_URL
       await fetch(`${API_URL}/api/admin/carousel/delete/${id}`, { method: 'DELETE' });
       fetchCarousel();
   };
 
-  const handleUpdateDetails = async (e) => {
-      e.preventDefault(); setUploading(true);
-      const formData = new FormData();
-      formData.append('title', editingItem.title); formData.append('description', editingItem.description);
-      formData.append('year', editingItem.year); formData.append('cast', editingItem.cast);
-      const fileInput = document.getElementById('editImageInput');
-      if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]);
-      
-      // 👇 UPDATED: Use API_URL
-      await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData });
-      alert("Details Updated!"); setUploading(false); fetchAll();
-  };
-
-  const handleAddEpisode = async (e) => {
-      e.preventDefault(); setUploading(true);
-      const formData = new FormData();
-      formData.append('contentId', editingItem.id); formData.append('seasonName', episodeForm.seasonName);
-      formData.append('title', episodeForm.title); formData.append('duration', episodeForm.duration);
-      const fileInput = document.getElementById('episodeVideoInput');
-      if(fileInput.files[0]) formData.append('videoFile', fileInput.files[0]); else { alert("Select video"); setUploading(false); return; }
-      
-      // 👇 UPDATED: Use API_URL
-      const res = await fetch(`${API_URL}/api/admin/add-episode`, { method: 'POST', body: formData });
-      if(res.ok) { 
-          alert("Episode Added!"); 
-          // 👇 UPDATED: Use API_URL (Dummy fetch to ensure update)
-          await fetch(`${API_URL}/api/user/dummy`).then(() => fetchAll()); 
-      }
-      setUploading(false);
-  };
-
-  const handleUpdateSeasonPoster = async (e) => {
-      e.preventDefault(); setUploading(true);
-      const formData = new FormData();
-      formData.append('contentId', editingItem.id); formData.append('seasonName', seasonPosterForm.seasonName);
-      const fileInput = document.getElementById('seasonPosterInput');
-      if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; }
-      
-      // 👇 UPDATED: Use API_URL
-      const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData });
-      if(res.ok) { alert("Poster Updated!"); fetchAll(); }
-      setUploading(false);
-  }
+  const handleDelete = async (id) => { if(!confirm("Delete?")) return; await fetch(`${API_URL}/api/admin/delete/${id}`, { method: 'DELETE' }); fetchAll(); };
+  const handleUpdateDetails = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('title', editingItem.title); formData.append('description', editingItem.description); formData.append('year', editingItem.year); formData.append('cast', editingItem.cast); const fileInput = document.getElementById('editImageInput'); if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]); await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData }); alert("Updated!"); setUploading(false); fetchAll(); };
+  const handleAddEpisode = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('contentId', editingItem.id); formData.append('seasonName', episodeForm.seasonName); formData.append('title', episodeForm.title); formData.append('duration', episodeForm.duration); const fileInput = document.getElementById('episodeVideoInput'); if(fileInput.files[0]) formData.append('videoFile', fileInput.files[0]); else { alert("Select video"); setUploading(false); return; } const res = await fetch(`${API_URL}/api/admin/add-episode`, { method: 'POST', body: formData }); if(res.ok) { alert("Episode Added!"); fetchAll(); } setUploading(false); };
+  const handleUpdateSeasonPoster = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('contentId', editingItem.id); formData.append('seasonName', seasonPosterForm.seasonName); const fileInput = document.getElementById('seasonPosterInput'); if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; } const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData }); if(res.ok) { alert("Poster Updated!"); fetchAll(); } setUploading(false); };
 
   const filteredList = contentList.filter(i => i.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#121212', color: '#e0e0e0', overflowY: 'auto', zIndex: 9999 }}>
+        
         <div style={{ height: '70px', background: '#1f1f1f', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 30px', position: 'sticky', top: 0, zIndex: 100 }}>
             <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid #555', color: '#fff', padding: '8px 16px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><FaArrowLeft /> Back to Website</button>
             <h2 style={{ margin: 0, color: '#fff' }}>Admin Dashboard</h2>
@@ -212,7 +167,7 @@ const AdminPage = () => {
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '40px' }}>
-                <button onClick={() => {setActiveTab('manage'); setEditingItem(null)}} className="btn" style={activeTab === 'manage' ? activeTabStyle : inactiveTabStyle}><FaEdit /> Manage</button>
+                <button onClick={() => {setActiveTab('manage'); setEditingItem(null)}} className="btn" style={activeTab === 'manage' ? activeTabStyle : inactiveTabStyle}><FaEdit /> Manage Content</button>
                 <button onClick={() => setActiveTab('add')} className="btn" style={activeTab === 'add' ? activeTabStyle : inactiveTabStyle}><FaPlus /> Add New</button>
                 <button onClick={() => setActiveTab('banners')} className="btn" style={activeTab === 'banners' ? activeTabStyle : inactiveTabStyle}><FaStar /> Hero Banners</button>
                 <button onClick={() => setActiveTab('analytics')} className="btn" style={activeTab === 'analytics' ? activeTabStyle : inactiveTabStyle}><FaChartBar /> Analytics</button>

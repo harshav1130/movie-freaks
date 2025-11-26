@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaEdit, FaPlus, FaSearch, FaUpload, FaImage, FaArrowLeft, FaTrash, FaStar, FaChartBar } from 'react-icons/fa';
+import { FaEdit, FaPlus, FaSearch, FaUpload, FaImage, FaArrowLeft, FaTrash, FaStar, FaChartBar, FaTimes } from 'react-icons/fa';
 import { API_URL } from '../config';
 
 const GENRES = ["Action", "Sci-Fi", "Drama", "Comedy", "Horror", "Thriller", "Romance", "Animation", "Fantasy", "Adventure"];
@@ -12,22 +12,25 @@ const AdminPage = () => {
   const [carouselList, setCarouselList] = useState([]);
   const [analytics, setAnalytics] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [uploading, setUploading] = useState(false);
   
-  // Forms
+  // 👇 NEW: Key to force-reset file inputs
+  const [resetKey, setResetKey] = useState(Date.now());
+
+  // --- ADD FORM STATE ---
   const [addFormData, setAddFormData] = useState({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [files, setFiles] = useState({ image: null, video: null, trailer: null });
   
-  // Banner Form
-  const [bannerForm, setBannerForm] = useState({ title: '', description: '', tag: 'Featured', videoUrl: '' });
-  const [bannerImageFile, setBannerImageFile] = useState(null);
-  const [bannerVideoFile, setBannerVideoFile] = useState(null);
-  
-  // Edit State
+  // --- EDIT & MANAGE STATE ---
   const [editingItem, setEditingItem] = useState(null);
   const [episodeForm, setEpisodeForm] = useState({ seasonName: 'Season 1', title: '', duration: '' });
   const [seasonPosterForm, setSeasonPosterForm] = useState({ seasonName: 'Season 1' });
-  const [uploading, setUploading] = useState(false);
+
+  // --- BANNER STATE ---
+  const [bannerForm, setBannerForm] = useState({ title: '', description: '', tag: 'Featured', videoUrl: '' });
+  const [bannerImageFile, setBannerImageFile] = useState(null);
+  const [bannerVideoFile, setBannerVideoFile] = useState(null);
   const [editingBanner, setEditingBanner] = useState(null);
 
   useEffect(() => { fetchAll(); fetchCarousel(); fetchAnalytics(); }, []);
@@ -42,7 +45,7 @@ const AdminPage = () => {
         setContentList([...(m || []), ...(s || []), ...(a || [])]);
       } catch (e) { console.error(e); }
   };
-
+  
   const fetchCarousel = async () => {
       try {
         const res = await fetch(`${API_URL}/api/carousel`);
@@ -69,11 +72,8 @@ const AdminPage = () => {
       fetchAll();
   };
 
-  // 👇 UPDATED: BETTER ERROR HANDLING FOR UPLOADS
   const handleAddSubmit = async (e) => {
-    e.preventDefault(); 
-    setUploading(true);
-
+    e.preventDefault(); setUploading(true);
     const data = new FormData();
     Object.keys(addFormData).forEach(key => data.append(key, addFormData[key]));
     data.append('genres', JSON.stringify(selectedGenres));
@@ -83,29 +83,15 @@ const AdminPage = () => {
 
     try {
         const res = await fetch(`${API_URL}/api/admin/add`, { method: 'POST', body: data });
-        
         if (res.ok) {
-            alert("✅ Content Uploaded Successfully!");
+            alert("✅ Content Uploaded!");
             setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
             setSelectedGenres([]); 
             setFiles({ image: null, video: null, trailer: null });
-            // Clear file inputs manually
-            document.querySelectorAll('input[type="file"]').forEach(i => i.value = '');
-            
-            fetchAll(); 
-            setActiveTab('manage');
-        } else {
-            // Try to get error message from server
-            const errorData = await res.json();
-            alert(`Upload Failed: ${errorData.error || "Server Error"}`);
-        }
-    } catch (err) { 
-        console.error(err);
-        alert("Network Error: File might be too large or Server is offline.");
-    } finally { 
-        // 👇 THIS ENSURES THE BUTTON ALWAYS UNLOCKS
-        setUploading(false); 
-    }
+            setResetKey(Date.now()); // 👈 FORCE RESET INPUTS
+            fetchAll(); setActiveTab('manage');
+        } else alert("Failed.");
+    } catch (err) { alert("Error"); } finally { setUploading(false); }
   };
 
   const handleBannerSubmit = async (e) => {
@@ -113,6 +99,7 @@ const AdminPage = () => {
       const data = new FormData();
       data.append('title', bannerForm.title); data.append('description', bannerForm.description);
       data.append('tag', bannerForm.tag); data.append('videoUrl', bannerForm.videoUrl);
+      
       if (bannerImageFile) data.append('imageFile', bannerImageFile);
       if (bannerVideoFile) data.append('videoFile', bannerVideoFile);
 
@@ -123,20 +110,18 @@ const AdminPage = () => {
             url = `${API_URL}/api/admin/carousel/update/${editingBanner.id}`;
             method = 'PUT';
         }
+
         const res = await fetch(url, { method: method, body: data });
         if(res.ok) { 
-            alert("✅ Banner Saved!"); 
+            alert(editingBanner ? "✅ Banner Updated!" : "✅ Banner Added!"); 
             setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' });
             setBannerImageFile(null); setBannerVideoFile(null);
             setEditingBanner(null);
-            const input = document.getElementById('bannerImgInput');
-            if(input) input.value = '';
+            setResetKey(Date.now()); // 👈 FORCE RESET INPUTS
             fetchCarousel(); 
-        } else {
-            const error = await res.json();
-            alert(`Failed: ${error.error}`);
         }
-      } catch(e) { alert("Error uploading banner"); }
+        else alert("Failed");
+      } catch(e) { alert("Error"); }
       setUploading(false);
   };
 
@@ -162,9 +147,10 @@ const AdminPage = () => {
       formData.append('year', editingItem.year); formData.append('cast', editingItem.cast);
       const fileInput = document.getElementById('editImageInput');
       if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]);
-      
       await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData });
-      alert("Details Updated!"); setUploading(false); fetchAll();
+      alert("Details Updated!"); 
+      setResetKey(Date.now()); 
+      setUploading(false); fetchAll();
   };
 
   const handleAddEpisode = async (e) => {
@@ -174,10 +160,8 @@ const AdminPage = () => {
       formData.append('title', episodeForm.title); formData.append('duration', episodeForm.duration);
       const fileInput = document.getElementById('episodeVideoInput');
       if(fileInput.files[0]) formData.append('videoFile', fileInput.files[0]); else { alert("Select video"); setUploading(false); return; }
-      
       const res = await fetch(`${API_URL}/api/admin/add-episode`, { method: 'POST', body: formData });
-      if(res.ok) { alert("Episode Added!"); await fetch(`${API_URL}/api/user/dummy`).then(() => fetchAll()); }
-      else alert("Failed to add episode.");
+      if(res.ok) { alert("Episode Added!"); setResetKey(Date.now()); fetchAll(); }
       setUploading(false);
   };
 
@@ -188,7 +172,7 @@ const AdminPage = () => {
       const fileInput = document.getElementById('seasonPosterInput');
       if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; }
       const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData });
-      if(res.ok) { alert("Poster Updated!"); fetchAll(); }
+      if(res.ok) { alert("Poster Updated!"); setResetKey(Date.now()); fetchAll(); }
       setUploading(false);
   }
 
@@ -203,6 +187,7 @@ const AdminPage = () => {
         </div>
 
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '40px' }}>
                 <button onClick={() => {setActiveTab('manage'); setEditingItem(null)}} className="btn" style={activeTab === 'manage' ? activeTabStyle : inactiveTabStyle}><FaEdit /> Manage Content</button>
                 <button onClick={() => setActiveTab('add')} className="btn" style={activeTab === 'add' ? activeTabStyle : inactiveTabStyle}><FaPlus /> Add New</button>
@@ -210,6 +195,7 @@ const AdminPage = () => {
                 <button onClick={() => setActiveTab('analytics')} className="btn" style={activeTab === 'analytics' ? activeTabStyle : inactiveTabStyle}><FaChartBar /> Analytics</button>
             </div>
 
+            {/* TAB: MANAGE */}
             {activeTab === 'manage' && !editingItem && (
                 <div>
                     <div className="search-bar" style={{ maxWidth: '600px', margin: '0 auto 30px auto', background: '#1f1f1f' }}><input type="text" placeholder="Search..." onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', background: 'transparent', border:'none', color:'#fff', padding:'10px' }} /><FaSearch style={{ marginRight: '15px', color: '#777' }} /></div>
@@ -231,6 +217,7 @@ const AdminPage = () => {
                 </div>
             )}
 
+            {/* TAB: ADD NEW */}
             {activeTab === 'add' && (
                 <div style={formContainerStyle}>
                     <h2 style={{ marginBottom: '20px', textAlign: 'center', borderBottom: '1px solid #333', paddingBottom: '15px' }}>Upload Content</h2>
@@ -248,14 +235,18 @@ const AdminPage = () => {
                         <label style={{color:'#aaa'}}>Genres</label>
                         <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>{GENRES.map(g => (<span key={g} onClick={() => handleGenreToggle(g)} style={{ padding:'5px 10px', borderRadius:'15px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #555', background: selectedGenres.includes(g) ? '#e50914' : 'transparent' }}>{g}</span>))}</div>
                         <div style={{display:'flex', alignItems:'center', gap:'10px', background:'#333', padding:'10px', borderRadius:'4px'}}><input type="checkbox" checked={addFormData.featured} onChange={(e) => setAddFormData({...addFormData, featured: e.target.checked})} /><label>Add to Hero Carousel (Featured)</label></div>
-                        <div style={fileBoxStyle}><label>Poster Image</label><input type="file" accept="image/*" onChange={(e) => setFiles({...files, image: e.target.files[0]})} required style={{color:'#fff'}} /></div>
-                        <div style={fileBoxStyle}><label>Trailer (Optional)</label><input type="file" accept="video/mp4" onChange={(e) => setFiles({...files, trailer: e.target.files[0]})} style={{color:'#fff'}} /></div>
-                        {addFormData.category === 'movie' && <div style={fileBoxStyle}><label>Full Movie File</label><input type="file" accept="video/mp4" onChange={(e) => setFiles({...files, video: e.target.files[0]})} required style={{color:'#fff'}} /></div>}
+                        
+                        {/* 👇 ADDED KEY PROP HERE */}
+                        <div style={fileBoxStyle}><label>Poster Image</label><input key={resetKey} type="file" accept="image/*" onChange={(e) => setFiles({...files, image: e.target.files[0]})} required style={{color:'#fff'}} /></div>
+                        <div style={fileBoxStyle}><label>Trailer (Optional)</label><input key={resetKey} type="file" accept="video/mp4" onChange={(e) => setFiles({...files, trailer: e.target.files[0]})} style={{color:'#fff'}} /></div>
+                        {addFormData.category === 'movie' && <div style={fileBoxStyle}><label>Full Movie File</label><input key={resetKey} type="file" accept="video/mp4" onChange={(e) => setFiles({...files, video: e.target.files[0]})} required style={{color:'#fff'}} /></div>}
+                        
                         <button type="submit" className="btn btn-red" disabled={uploading} style={{ marginTop: '10px', padding: '15px', opacity: uploading ? 0.7 : 1 }}>{uploading ? "Uploading..." : "Upload Content"}</button>
                     </form>
                 </div>
             )}
 
+            {/* TAB: HERO BANNERS */}
             {activeTab === 'banners' && (
                 <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, background: '#1f1f1f', padding: '30px', borderRadius: '10px', border: '1px solid #333' }}>
@@ -267,8 +258,11 @@ const AdminPage = () => {
                             <input type="text" placeholder="Movie Title" value={bannerForm.title} onChange={e=>setBannerForm({...bannerForm, title:e.target.value})} style={inputStyle} required />
                             <input type="text" placeholder="Tag (e.g. Featured Movie)" value={bannerForm.tag} onChange={e=>setBannerForm({...bannerForm, tag:e.target.value})} style={inputStyle} />
                             <textarea placeholder="Short Description" value={bannerForm.description} onChange={e=>setBannerForm({...bannerForm, description:e.target.value})} style={inputStyle} required />
-                            <div style={fileBoxStyle}><label>Wide Wallpaper (1920x1080)</label><input id="bannerImgInput" type="file" accept="image/*" onChange={e=>setBannerImageFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
-                            <div style={fileBoxStyle}><label>Video</label><input type="file" accept="video/mp4" onChange={e=>setBannerVideoFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
+                            
+                            {/* 👇 ADDED KEY PROP HERE */}
+                            <div style={fileBoxStyle}><label>Wide Wallpaper (1920x1080)</label><input key={resetKey} type="file" accept="image/*" onChange={e=>setBannerImageFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
+                            <div style={fileBoxStyle}><label>Video</label><input key={resetKey} type="file" accept="video/mp4" onChange={e=>setBannerVideoFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
+                            
                             <button type="submit" className="btn btn-red" disabled={uploading}>{uploading?"Uploading...": editingBanner ? "Update Banner" : "Add Banner"}</button>
                         </form>
                     </div>
@@ -292,6 +286,24 @@ const AdminPage = () => {
                 </div>
             )}
 
+            {/* TAB: ANALYTICS */}
+            {activeTab === 'analytics' && (
+                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                    <h2 style={{textAlign:'center', marginBottom:'30px'}}>Top 5 Most Watched</h2>
+                    <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                        {analytics.map((item, index) => (
+                            <div key={item.id} style={{display:'flex', alignItems:'center', background:'#222', padding:'15px', borderRadius:'8px', borderBottom:`4px solid ${index===0?'#e50914':'#333'}`}}>
+                                <span style={{fontSize:'1.5rem', fontWeight:'bold', width:'40px', color:'#777'}}>#{index+1}</span>
+                                <img src={item.image} style={{width:'50px', height:'75px', objectFit:'cover', borderRadius:'4px', marginRight:'20px'}} alt=""/>
+                                <div style={{flex:1}}><h3 style={{margin:0}}>{item.title}</h3><p style={{color:'#aaa', fontSize:'0.9rem', margin:'5px 0 0 0'}}>{item.category.toUpperCase()}</p></div>
+                                <div style={{textAlign:'right'}}><span style={{fontSize:'1.5rem', fontWeight:'bold', color:'#fff'}}>{item.views || 0}</span><p style={{margin:0, fontSize:'0.8rem', color:'#aaa'}}>Views</p></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT VIEW */}
             {editingItem && (
                 <div>
                     <button onClick={() => setEditingItem(null)} style={{ marginBottom: '20px', background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><FaArrowLeft /> Back to List</button>
@@ -303,7 +315,8 @@ const AdminPage = () => {
                                 <label>Description</label><textarea rows="5" value={editingItem.description} onChange={(e) => setEditingItem({...editingItem, description: e.target.value})} style={inputStyle} />
                                 <label>Year</label><input type="text" value={editingItem.year || ''} onChange={(e) => setEditingItem({...editingItem, year: e.target.value})} style={inputStyle} />
                                 <label>Cast</label><input type="text" value={editingItem.cast || ''} onChange={(e) => setEditingItem({...editingItem, cast: e.target.value})} style={inputStyle} />
-                                <label>New Poster</label><input type="file" id="editImageInput" style={inputStyle} />
+                                {/* 👇 ADDED KEY PROP HERE TOO */}
+                                <label>New Poster</label><input key={resetKey} type="file" id="editImageInput" style={inputStyle} />
                                 <button type="submit" className="btn btn-red" disabled={uploading}>{uploading ? "Updating..." : "Save Changes"}</button>
                             </form>
                         </div>
@@ -317,7 +330,8 @@ const AdminPage = () => {
                                             <div style={{flex:1}}><label style={{color:'#aaa', fontSize:'0.9rem'}}>Duration</label><input type="text" placeholder="e.g. 24m" value={episodeForm.duration} onChange={e => setEpisodeForm({...episodeForm, duration: e.target.value})} style={{...inputStyle, width:'100%'}} required /></div>
                                         </div>
                                         <input type="text" placeholder="Episode Title" value={episodeForm.title} onChange={e => setEpisodeForm({...episodeForm, title: e.target.value})} style={inputStyle} required />
-                                        <div style={fileBoxStyle}><label style={{color:'#aaa', fontSize:'0.9rem'}}>Video File</label><input type="file" id="episodeVideoInput" accept="video/mp4" style={{color:'#fff'}} required /></div>
+                                        {/* 👇 ADDED KEY PROP HERE TOO */}
+                                        <div style={fileBoxStyle}><label style={{color:'#aaa', fontSize:'0.9rem'}}>Video File</label><input key={resetKey} type="file" id="episodeVideoInput" accept="video/mp4" style={{color:'#fff'}} required /></div>
                                         <button type="submit" className="btn btn-red" disabled={uploading} style={{marginTop:'10px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>{uploading ? "Uploading..." : <><FaUpload /> Push Episode</>}</button>
                                     </form>
                                 </div>
@@ -325,28 +339,13 @@ const AdminPage = () => {
                                     <h3>Update Season Poster</h3>
                                     <form onSubmit={handleUpdateSeasonPoster} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
                                         <select value={seasonPosterForm.seasonName} onChange={e => setSeasonPosterForm({...seasonPosterForm, seasonName: e.target.value})} style={inputStyle}>{editingItem.seasons?.map((s, i) => <option key={i} value={s.name}>{s.name}</option>)}</select>
-                                        <div style={fileBoxStyle}><label style={{color:'#aaa', fontSize:'0.9rem'}}>Season Poster Image</label><input type="file" id="seasonPosterInput" accept="image/*" style={{color:'#fff'}} required /></div>
+                                        {/* 👇 ADDED KEY PROP HERE TOO */}
+                                        <div style={fileBoxStyle}><label style={{color:'#aaa', fontSize:'0.9rem'}}>Season Poster Image</label><input key={resetKey} type="file" id="seasonPosterInput" accept="image/*" style={{color:'#fff'}} required /></div>
                                         <button type="submit" className="btn btn-red" disabled={uploading}>{uploading ? "Uploading..." : <><FaImage /> Update Poster</>}</button>
                                     </form>
                                 </div>
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'analytics' && (
-                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                    <h2 style={{textAlign:'center', marginBottom:'30px'}}>Top 5 Most Watched</h2>
-                    <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
-                        {analytics.map((item, index) => (
-                            <div key={item.id} style={{display:'flex', alignItems:'center', background:'#222', padding:'15px', borderRadius:'8px', borderBottom:`4px solid ${index===0?'#e50914':'#333'}`}}>
-                                <span style={{fontSize:'1.5rem', fontWeight:'bold', width:'40px', color:'#777'}}>#{index+1}</span>
-                                <img src={item.image} style={{width:'50px', height:'75px', objectFit:'cover', borderRadius:'4px', marginRight:'20px'}} alt=""/>
-                                <div style={{flex:1}}><h3 style={{margin:0}}>{item.title}</h3><p style={{color:'#aaa', fontSize:'0.9rem', margin:'5px 0 0 0'}}>{item.category.toUpperCase()}</p></div>
-                                <div style={{textAlign:'right'}}><span style={{fontSize:'1.5rem', fontWeight:'bold', color:'#fff'}}>{item.views || 0}</span><p style={{margin:0, fontSize:'0.8rem', color:'#aaa'}}>Views</p></div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             )}

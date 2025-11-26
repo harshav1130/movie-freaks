@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlay, FaInfoCircle, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
-import { API_URL } from '../config'; // 👈 IMPORT API_URL
+import { API_URL } from '../config';
 
 const HeroCarousel = ({ onPlay, onDetails }) => {
   const [slides, setSlides] = useState([]);
@@ -8,12 +8,11 @@ const HeroCarousel = ({ onPlay, onDetails }) => {
   const [isPaused, setIsPaused] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 👇 FETCH SLIDES FROM DB (Using API_URL)
+  // Fetch Slides
   useEffect(() => {
     fetch(`${API_URL}/api/carousel`)
       .then(res => res.json())
       .then(data => {
-          // Check if data is an array, otherwise set empty
           if (Array.isArray(data) && data.length > 0) {
               setSlides(data);
           } else {
@@ -27,6 +26,7 @@ const HeroCarousel = ({ onPlay, onDetails }) => {
       });
   }, []);
 
+  // Auto-Slide Logic
   useEffect(() => {
     if (isPaused || slides.length === 0) return;
     const timer = setInterval(() => {
@@ -38,16 +38,16 @@ const HeroCarousel = ({ onPlay, onDetails }) => {
   const nextSlide = () => setCurrent((current + 1) % slides.length);
   const prevSlide = () => setCurrent(current === 0 ? slides.length - 1 : current - 1);
 
-  // --- LOADING STATE ---
+  // --- LOADING STATE (Improved Skeleton) ---
   if (loading) {
       return (
-        <section className="hero" style={{ display:'flex', justifyContent:'center', alignItems:'center', background:'#000' }}>
-            <div className="skeleton-card" style={{ width:'100%', height:'100%', borderRadius:0 }}></div>
+        <section className="hero" style={{ background: '#141414', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%)', backgroundSize: '200% 100%', animation: 'pulse 1.5s infinite' }}></div>
         </section>
       );
   }
 
-  // --- EMPTY STATE (Prevents Crash if DB is empty) ---
+  // --- EMPTY STATE ---
   if (slides.length === 0) return null;
 
   return (
@@ -83,7 +83,7 @@ const HeroCarousel = ({ onPlay, onDetails }) => {
             <div className="hero-content-app" style={{ zIndex: 10 }}>
               <span className={`tag ${index === current ? 'animate-text' : ''}`}>{slide.tag || 'Featured'}</span>
               
-              <h1 className={index === current ? 'animate-text' : ''} style={{ fontSize: '3.5rem', textShadow: '2px 2px 4px black' }}>
+              <h1 className={index === current ? 'animate-text' : ''} style={{ fontSize: '3.5rem', textShadow: '2px 2px 4px black', lineHeight: 1.1 }}>
                   {slide.title}
               </h1>
               

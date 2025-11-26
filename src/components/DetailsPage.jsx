@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FaPlay, FaPlus, FaArrowLeft, FaTrash } from 'react-icons/fa';
-import { API_URL } from '../config'; // 👈 Import API_URL
+import { API_URL } from '../config'; 
 
 const DetailsPage = ({ onAddToList, onRemoveFromList, onPlay, myList }) => {
   const location = useLocation();
@@ -16,14 +16,12 @@ const DetailsPage = ({ onAddToList, onRemoveFromList, onPlay, myList }) => {
   const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(0);
   const [episodesToDisplay, setEpisodesToDisplay] = useState([]);
   
-  // 1. Helper to fix URLs (replaces localhost with real API_URL)
   const fixUrl = (url) => {
       if (!url) return '';
       if (url.startsWith('http')) return url.replace('http://localhost:3001', API_URL);
       return url;
   };
 
-  // 2. Initialize Image State with fixed URL
   const [currentImage, setCurrentImage] = useState(fixUrl(item?.image));
 
   useEffect(() => {
@@ -101,10 +99,11 @@ const DetailsPage = ({ onAddToList, onRemoveFromList, onPlay, myList }) => {
           height: '85vh', width: '100%', backgroundImage: `url(${currentImage})`, 
           backgroundColor: '#000', backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', position: 'relative' 
       }}>
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '400px', background: 'linear-gradient(to top, #141414, transparent)' }}></div>
+          {/* CLEAN GRADIENT FADE (No Red) */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '400px', background: 'linear-gradient(to top, #141414 10%, transparent 100%)' }}></div>
           
           <div style={{ position: 'absolute', bottom: '100px', left: '5%', maxWidth: '700px', textShadow: '2px 2px 8px #000' }}>
-              <h1 style={{ fontSize: '4rem', fontWeight: '800', marginBottom: '20px', lineHeight: 1.1 }}>{item.title}</h1>
+              <h1 style={{ fontSize: '4rem', fontWeight: '800', marginBottom: '20px', lineHeight: 1.1, textShadow: '2px 2px 10px rgba(0,0,0,0.9)' }}>{item.title}</h1>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', fontSize: '1.1rem', color: '#46d369', fontWeight: 'bold' }}>
                 <span>{item.rating * 10}% Match</span>
@@ -112,8 +111,8 @@ const DetailsPage = ({ onAddToList, onRemoveFromList, onPlay, myList }) => {
                 <span style={{ border: '1px solid #fff', padding: '0 5px', color: '#fff', fontSize: '0.8rem' }}>HD</span>
               </div>
 
-              <p style={{ fontSize: '1.2rem', lineHeight: '1.5', marginBottom: '30px', color: '#ddd' }}>{item.description}</p>
-              <p style={{ color: '#aaa', marginBottom: '20px' }}><strong>Cast:</strong> {item.cast || 'Unavailable'}</p>
+              <p style={{ fontSize: '1.2rem', lineHeight: '1.5', marginBottom: '30px', color: '#ddd', textShadow: '1px 1px 5px #000' }}>{item.description}</p>
+              <p style={{ color: '#bbb', marginBottom: '20px', textShadow: '1px 1px 5px #000' }}><strong>Cast:</strong> {item.cast || 'Unavailable'}</p>
 
               <div style={{ display: 'flex', gap: '20px' }}>
                   <button onClick={() => handlePlayClick(currentVideo)} style={{ padding: '15px 40px', fontSize: '1.3rem', fontWeight: 'bold', borderRadius: '5px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#fff', color: '#000' }}><FaPlay /> Play</button>
@@ -134,7 +133,6 @@ const DetailsPage = ({ onAddToList, onRemoveFromList, onPlay, myList }) => {
                       </div>
                   )}
               </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '50px' }}>
                   {episodesToDisplay.map((ep, index) => (
                       <div key={index} onClick={() => handlePlayClick(ep.url)} style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#222', borderRadius: '8px', cursor: 'pointer', border: '1px solid #333', transition: '0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#333'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#222'}>
@@ -143,10 +141,7 @@ const DetailsPage = ({ onAddToList, onRemoveFromList, onPlay, myList }) => {
                               <img src={fixUrl(item.image)} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }} alt="thumb" />
                               <FaPlay style={{ position: 'absolute', top: '35%', left: '42%', color: '#fff' }} />
                           </div>
-                          <div style={{ flex: 1 }}>
-                              <h4 style={{ fontSize: '1.2rem', marginBottom: '5px' }}>{ep.title}</h4>
-                              <p style={{ color: '#aaa' }}>{ep.description || "Click to watch episode."}</p>
-                          </div>
+                          <div style={{ flex: 1 }}><h4 style={{ fontSize: '1.2rem', marginBottom: '5px' }}>{ep.title}</h4><p style={{ color: '#aaa' }}>{ep.description || "Click to watch episode."}</p></div>
                           <span style={{ color: '#fff' }}>{ep.duration}</span>
                       </div>
                   ))}

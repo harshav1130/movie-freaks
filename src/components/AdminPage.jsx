@@ -189,7 +189,7 @@ const AdminPage = () => {
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '40px' }}>
-                <button onClick={() => {setActiveTab('manage'); setEditingItem(null)}} className="btn" style={activeTab === 'manage' ? activeTabStyle : inactiveTabStyle}><FaEdit /> Manage Content</button>
+                <button onClick={() => {setActiveTab('manage'); setEditingItem(null)}} className="btn" style={activeTab === 'manage' ? activeTabStyle : inactiveTabStyle}><FaEdit /> Manage</button>
                 <button onClick={() => setActiveTab('add')} className="btn" style={activeTab === 'add' ? activeTabStyle : inactiveTabStyle}><FaPlus /> Add New</button>
                 <button onClick={() => setActiveTab('banners')} className="btn" style={activeTab === 'banners' ? activeTabStyle : inactiveTabStyle}><FaStar /> Hero Banners</button>
                 <button onClick={() => setActiveTab('analytics')} className="btn" style={activeTab === 'analytics' ? activeTabStyle : inactiveTabStyle}><FaChartBar /> Analytics</button>
@@ -259,7 +259,7 @@ const AdminPage = () => {
                             <input type="text" placeholder="Tag (e.g. Featured Movie)" value={bannerForm.tag} onChange={e=>setBannerForm({...bannerForm, tag:e.target.value})} style={inputStyle} />
                             <textarea placeholder="Short Description" value={bannerForm.description} onChange={e=>setBannerForm({...bannerForm, description:e.target.value})} style={inputStyle} required />
                             
-                            {/* 👇 ADDED KEY PROP HERE */}
+                            {/* 👇 ADDED KEY PROP HERE TOO */}
                             <div style={fileBoxStyle}><label>Wide Wallpaper (1920x1080)</label><input key={resetKey} type="file" accept="image/*" onChange={e=>setBannerImageFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
                             <div style={fileBoxStyle}><label>Video</label><input key={resetKey} type="file" accept="video/mp4" onChange={e=>setBannerVideoFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
                             

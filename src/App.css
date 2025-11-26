@@ -240,7 +240,7 @@ body {
     .slide-button.right { right: 5px; }
     
     /* Mobile Navbar */
-    .navbar { flex-wrap: nowrap; align-items: center; padding: 10px 15px; height: 60px; justify-content: space-between; }
+    .navbar { flex-wrap: nowrap; align-items: center; padding: 10px 15px; height: 60px; justify-content: space-between; width: 100%;}
     .menu-toggle { display: block; order: 1; margin: 0; }
     .logo-app { order: 2; position: absolute; left: 50%; transform: translateX(-50%); font-size: 1.5rem; margin: 0; }
     #auth-buttons-app { order: 3; margin: 0; }

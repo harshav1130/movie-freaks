@@ -14,17 +14,18 @@ const ContentRow = ({ title, data, onCardClick, type, onRemove, loading, id }) =
 
   return (
     <section className="content-grid" id={id}>
-      <h2>{title}</h2>
+      <h2 style={{ textTransform: 'capitalize' }}>{title}</h2>
       <div className="slider-wrapper">
         <div className="grid-container" ref={rowRef}>
           
           {loading ? (
+              // Skeleton Loading
               [...Array(6)].map((_, i) => <div key={i} className="skeleton-card"></div>)
           ) : (
               data.map((item, index) => (
                 <div key={index} className="card" style={{ position: 'relative' }}>
                   
-                  {/* 👇 UPDATED LOGIC: Show X button for 'MyList' OR 'History' */}
+                  {/* Remove Button (Visible for MyList & History) */}
                   {(type === 'MyList' || type === 'History') && (
                       <button 
                         className="remove-btn"
@@ -32,7 +33,7 @@ const ContentRow = ({ title, data, onCardClick, type, onRemove, loading, id }) =
                             e.stopPropagation(); 
                             onRemove(item);
                         }}
-                        title="Remove"
+                        title="Remove from list"
                       >
                         <FaTimesCircle />
                       </button>
@@ -40,11 +41,20 @@ const ContentRow = ({ title, data, onCardClick, type, onRemove, loading, id }) =
 
                   <div onClick={() => onCardClick(item, type)}>
                       <div className="card-image">
-                        <img src={item.image} alt={item.title} />
+                        {/* Handle missing images safely */}
+                        <img 
+                            src={item.image || "https://via.placeholder.com/300x450?text=No+Image"} 
+                            alt={item.title} 
+                            loading="lazy" // Performance boost
+                        />
                       </div>
                       <div className="card-info">
                         <h3>{item.title}</h3>
-                        <p className="meta">⭐ {item.rating || 4.5} | {type}</p>
+                        <div className="meta" style={{ display:'flex', justifyContent:'space-between', fontSize:'0.8rem', color:'#aaa' }}>
+                            {/* Show Rating & Year */}
+                            <span>⭐ {item.rating || 'N/A'}</span>
+                            <span>{item.year || ''}</span>
+                        </div>
                       </div>
                   </div>
 
@@ -53,6 +63,8 @@ const ContentRow = ({ title, data, onCardClick, type, onRemove, loading, id }) =
           )}
           
         </div>
+        
+        {/* Navigation Arrows (Hidden on mobile via CSS) */}
         <button className="slide-button left" onClick={() => scroll(-1)}><FaChevronLeft /></button>
         <button className="slide-button right" onClick={() => scroll(1)}><FaChevronRight /></button>
       </div>

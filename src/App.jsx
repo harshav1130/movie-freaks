@@ -17,7 +17,7 @@ const App = () => {
   // User State
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('mf_user')));
   const [myList, setMyList] = useState(user?.watchlist || []);
-  const [history, setHistory] = useState(user?.continueWatching || []); 
+  const [history, setHistory] = useState(user?.continueWatching || []);
 
   // Content State
   const [movies, setMovies] = useState([]);
@@ -51,15 +51,16 @@ const App = () => {
 
   const fetchUserData = async () => {
       try {
-          // 👇 UPDATED: Use API_URL
           const res = await fetch(`${API_URL}/api/user/${user.email}`);
           const data = await res.json();
           if (res.ok) {
               setMyList(data.watchlist);
-              setHistory(data.continueWatching); 
+              setHistory(data.continueWatching);
               
               const updatedUser = { ...user, watchlist: data.watchlist, continueWatching: data.continueWatching };
               localStorage.setItem('mf_user', JSON.stringify(updatedUser));
+              // If role changed to admin in DB, update state
+              if (user.role !== data.role) setUser(updatedUser);
           }
       } catch (e) { console.error("Failed to sync user data"); }
   };
@@ -67,7 +68,6 @@ const App = () => {
   const fetchAllContent = async () => {
     setLoading(true);
     try {
-      // 👇 UPDATED: Use API_URL for all content
       const resMovies = await fetch(`${API_URL}/api/movies`);
       setMovies(await resMovies.json());
 
@@ -90,7 +90,6 @@ const App = () => {
       navigate('/details', { state: { item } });
   };
 
-  // --- NEW: HANDLE HERO PLAY ---
   const handleHeroPlay = (item) => {
       handlePlayVideo(item);
       navigate('/details', { state: { item, autoPlay: true } });
@@ -100,7 +99,6 @@ const App = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-        // 👇 UPDATED: Use API_URL
         const res = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) });
         const data = await res.json();
         if(res.ok) { 
@@ -116,7 +114,6 @@ const App = () => {
   const handleSignup = async (e) => {
     e.preventDefault();
     try {
-        // 👇 UPDATED: Use API_URL
         const res = await fetch(`${API_URL}/api/auth/signup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) });
         if(res.ok) { handleLogin(e); setShowSignUp(false); } 
         else { alert("Signup failed"); }
@@ -136,7 +133,6 @@ const App = () => {
   const handleUpdateProfile = async (e) => {
       e.preventDefault();
       try {
-          // 👇 UPDATED: Use API_URL
           const res = await fetch(`${API_URL}/api/user/update`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, newUsername, newPassword }) });
           const data = await res.json();
           if (res.ok) {
@@ -153,7 +149,6 @@ const App = () => {
       if (!myList.find(i => i.id === item.id)) {
           const newList = [...myList, item];
           setMyList(newList);
-          // 👇 UPDATED: Use API_URL
           await fetch(`${API_URL}/api/user/watchlist`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, item }) });
       }
   };
@@ -162,7 +157,6 @@ const App = () => {
     const newList = myList.filter(i => i.id !== item.id);
     setMyList(newList);
     try {
-        // 👇 UPDATED: Use API_URL
         await fetch(`${API_URL}/api/user/watchlist/remove`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, item }) });
         const updatedUser = { ...user, watchlist: newList };
         localStorage.setItem('mf_user', JSON.stringify(updatedUser));
@@ -173,7 +167,6 @@ const App = () => {
     const newHistory = history.filter(i => i.id !== item.id);
     setHistory(newHistory);
     try {
-        // 👇 UPDATED: Use API_URL
         await fetch(`${API_URL}/api/user/history/remove`, { 
             method: 'POST', headers: {'Content-Type': 'application/json'}, 
             body: JSON.stringify({ email: user.email, item }) 
@@ -186,7 +179,6 @@ const App = () => {
   const handlePlayVideo = async (item) => { 
       const newHistory = [item, ...history.filter(i => i.id !== item.id)]; 
       setHistory(newHistory); 
-      // 👇 UPDATED: Use API_URL
       await fetch(`${API_URL}/api/user/history`, { 
           method: 'POST', headers: {'Content-Type': 'application/json'}, 
           body: JSON.stringify({ email: user.email, item }) 

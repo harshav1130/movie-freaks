@@ -60,6 +60,11 @@ const upload = multer({ storage: storage });
 
 // 4. DATABASE CONNECTION
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ottProject_Final_v7';
+
+console.log("------------------------------------------------");
+console.log("🔌 CONNECTING TO:", MONGO_URI.includes("mongodb.net") ? "☁️ CLOUD (Atlas)" : "💻 LOCALHOST");
+console.log("------------------------------------------------");
+
 mongoose.connect(MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.log('❌ DB Error:', err));

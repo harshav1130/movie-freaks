@@ -158,6 +158,31 @@ app.get('/api/series', async (req, res) => { res.json(await SeriesModel.find());
 app.get('/api/anime', async (req, res) => { res.json(await AnimeModel.find()); });
 app.get('/api/carousel', async (req, res) => { res.json(await CarouselModel.find()); });
 app.delete('/api/admin/delete/:id', async (req, res) => { await MovieModel.deleteOne({ id: req.params.id }); await SeriesModel.deleteOne({ id: req.params.id }); await AnimeModel.deleteOne({ id: req.params.id }); res.json({ message: "Deleted" }); });
+app.post('/api/admin/carousel/add-direct', async (req, res) => {
+    try {
+        const data = req.body;
+        data.id = Math.floor(Math.random() * 100000);
+        
+        await CarouselModel.create(data);
+        res.json({ message: "Banner Added!" });
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: "Failed to save banner" }); 
+    }
+});
+
+// 👇 NEW: DIRECT CAROUSEL UPDATE
+app.put('/api/admin/carousel/update-direct/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        await CarouselModel.findOneAndUpdate({ id: id }, updates);
+        res.json({ message: "Banner Updated!" });
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: "Failed to update banner" }); 
+    }
+});
 app.delete('/api/admin/carousel/delete/:id', async (req, res) => { await CarouselModel.deleteOne({ id: req.params.id }); res.json({ message: "Deleted" }); });
 app.post('/api/content/view/:id', async (req, res) => { try { const { id } = req.params; let item = await MovieModel.findOne({ id }) || await SeriesModel.findOne({ id }) || await AnimeModel.findOne({ id }); if (item) { item.views = (item.views || 0) + 1; await item.save(); res.json({ views: item.views }); } } catch (e) { res.status(500).json({ error: "Error" }); } });
 app.get('/api/admin/analytics', async (req, res) => { const movies = await MovieModel.find(); const series = await SeriesModel.find(); const anime = await AnimeModel.find(); const all = [...movies, ...series, ...anime]; const top5 = all.sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5); res.json(top5); });

@@ -113,37 +113,68 @@ const AdminPage = () => {
 
   // 2. Add/Update Banner
   const handleBannerSubmit = async (e) => {
-      e.preventDefault(); setUploading(true); setUploadProgress("Uploading...");
+    e.preventDefault(); 
+    setUploading(true); 
+    // Reuse the progress state from the main form or create a generic one
+    // (Assuming setUploadProgress exists in your component from previous steps)
+    
+    try {
+      let imageUrl = editingBanner?.image || "";
+      let videoUrl = editingBanner?.videoUrl || "";
+
+      // 1. Upload to Cloudinary first
+      if (bannerImageFile) {
+          const url = await uploadToCloudinary(bannerImageFile, 'image');
+          if (url) imageUrl = url;
+      }
+      if (bannerVideoFile) {
+          const url = await uploadToCloudinary(bannerVideoFile, 'video');
+          if (url) videoUrl = url;
+      }
+
+      // 2. Prepare JSON Payload
+      const payload = { 
+          ...bannerForm, 
+          image: imageUrl, 
+          videoUrl: videoUrl 
+      };
       
-      try {
-        let imageUrl = editingBanner?.image || "";
-        let videoUrl = editingBanner?.videoUrl || "";
+      // 3. Send JSON to Backend
+      let url = `${API_URL}/api/admin/carousel/add-direct`;
+      let method = 'POST';
+      
+      if (editingBanner) {
+          url = `${API_URL}/api/admin/carousel/update-direct/${editingBanner.id}`;
+          method = 'PUT';
+      }
 
-        if (bannerFiles.image) imageUrl = await uploadToCloudinary(bannerFiles.image, 'image');
-        if (bannerFiles.video) videoUrl = await uploadToCloudinary(bannerFiles.video, 'video');
-
-        const payload = { ...bannerForm, image: imageUrl, videoUrl };
-        
-        let url = `${API_URL}/api/admin/carousel/add-direct`;
-        let method = 'POST';
-        if (editingBanner) {
-            url = `${API_URL}/api/admin/carousel/update-direct/${editingBanner.id}`;
-            method = 'PUT';
-        }
-
-        const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-        
-        if(res.ok) { 
-            alert("✅ Banner Saved!"); 
-            setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' });
-            setBannerFiles({ image: null, video: null });
-            setEditingBanner(null);
-            setResetKey(Date.now());
-            fetchCarousel(); 
-        } else alert("Failed");
-      } catch(e) { alert("Error"); }
-      setUploading(false);
-  };
+      const res = await fetch(url, { 
+          method, 
+          headers: {'Content-Type':'application/json'}, 
+          body: JSON.stringify(payload) 
+      });
+      
+      if(res.ok) { 
+          alert(editingBanner ? "✅ Banner Updated!" : "✅ Banner Added!"); 
+          
+          // Reset Form
+          setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' });
+          setBannerImageFile(null); 
+          setBannerVideoFile(null);
+          setEditingBanner(null);
+          setResetKey(Date.now()); // Clear file inputs
+          
+          fetchCarousel(); 
+      } else {
+          alert("Backend failed to save banner.");
+      }
+    } catch(e) { 
+        console.error(e);
+        alert("Error uploading banner assets."); 
+    } finally {
+        setUploading(false);
+    }
+};
 
   // 👇 UPDATED: SAFE EDIT INITIALIZATION
   const startEditBanner = (item) => {

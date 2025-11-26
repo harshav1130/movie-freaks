@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import './App.css';
-import { API_URL } from './config'; // 👈 Import API_URL
+import { API_URL } from './config'; 
 
 // Components
 import IntroScreen from './components/IntroScreen';
@@ -14,8 +14,12 @@ import AdminPage from './components/AdminPage';
 const App = () => {
   const [showIntro, setShowIntro] = useState(true);
   
-  // User State
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('mf_user')));
+  // 👇 FIX: Initialize State directly from Local Storage
+  const [user, setUser] = useState(() => {
+      const savedUser = localStorage.getItem('mf_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   const [myList, setMyList] = useState(user?.watchlist || []);
   const [history, setHistory] = useState(user?.continueWatching || []);
 
@@ -43,13 +47,15 @@ const App = () => {
 
   useEffect(() => {
     if (user) {
-      setShowIntro(false);
+      setShowIntro(false); // Skip intro if logged in
       fetchAllContent();
       fetchUserData(); 
     }
   }, [user?.email]);
 
+  // 👇 SYNC DATA ON REFRESH
   const fetchUserData = async () => {
+      if (!user?.email) return;
       try {
           const res = await fetch(`${API_URL}/api/user/${user.email}`);
           const data = await res.json();
@@ -57,9 +63,11 @@ const App = () => {
               setMyList(data.watchlist);
               setHistory(data.continueWatching);
               
-              const updatedUser = { ...user, watchlist: data.watchlist, continueWatching: data.continueWatching };
+              // Update Local Storage silently to keep it fresh
+              const updatedUser = { ...user, ...data };
               localStorage.setItem('mf_user', JSON.stringify(updatedUser));
-              // If role changed to admin in DB, update state
+              
+              // Only update state if role changed (avoids re-renders)
               if (user.role !== data.role) setUser(updatedUser);
           }
       } catch (e) { console.error("Failed to sync user data"); }
@@ -102,6 +110,7 @@ const App = () => {
         const res = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) });
         const data = await res.json();
         if(res.ok) { 
+            // 👇 Save to Local Storage FIRST
             localStorage.setItem('mf_user', JSON.stringify(data.user)); 
             setUser(data.user); 
             setMyList(data.user.watchlist);
@@ -121,6 +130,7 @@ const App = () => {
   };
 
   const handleLogout = () => {
+    // 👇 CLEAR STORAGE
     localStorage.removeItem('mf_user');
     setUser(null);
     setShowIntro(true);
@@ -139,7 +149,7 @@ const App = () => {
               alert("Profile Updated!");
               const updatedUser = { ...user, username: data.username };
               setUser(updatedUser);
-              localStorage.setItem('mf_user', JSON.stringify(updatedUser));
+              localStorage.setItem('mf_user', JSON.stringify(updatedUser)); // Update storage
               setShowSettings(false);
           }
       } catch(e) { alert("Update failed"); }
@@ -209,7 +219,6 @@ const App = () => {
               <main>
                 {!searchTerm && <HeroCarousel onPlay={handleHeroPlay} onDetails={handleCardClick} />}
                 
-                {/* HISTORY ROW */}
                 {filterContent(history).length > 0 && (
                     <ContentRow 
                         id="history"
@@ -248,7 +257,6 @@ const App = () => {
           
           <Route path="/details" element={<DetailsPage myList={myList} onAddToList={addToWatchlist} onRemoveFromList={removeFromWatchlist} onPlay={handlePlayVideo} />} />
           
-          {/* ADMIN ROUTE */}
           <Route path="/admin" element={
              user?.role === 'admin' ? <AdminPage /> : <div style={{color:'white', textAlign:'center', marginTop:'100px'}}><h1>Access Denied</h1><p>You are not an admin.</p></div>
           } />

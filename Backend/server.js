@@ -22,20 +22,17 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ==================================================
-// 1. MIDDLEWARE
+// 1. ROBUST CORS CONFIGURATION
 // ==================================================
 app.use(cors({
     origin: [
-        "http://localhost:5173",                  // Allow Localhost
-        "https://movie-freaks.vercel.app"         // Allow Vercel
+        "http://localhost:5173",                  
+        "https://movie-freaks.vercel.app" // Ensure NO trailing slash here
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
-
-// ❌ REMOVED THE CRASHING LINE (app.options)
-// The app.use(cors()) above handles preflight requests automatically.
 
 app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -120,7 +117,6 @@ app.post('/api/user/watchlist', async (req, res) => { const user = await User.fi
 app.post('/api/user/watchlist/remove', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.watchlist = user.watchlist.filter(i=>i.id!==req.body.item.id); await user.save(); res.json(user.watchlist); });
 app.post('/api/user/history', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.continueWatching=user.continueWatching.filter(i=>i.id!==req.body.item.id); user.continueWatching.unshift(req.body.item); await user.save(); res.json(user.continueWatching); });
 app.post('/api/user/history/remove', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.continueWatching=user.continueWatching.filter(i=>i.id!==req.body.item.id); await user.save(); res.json(user.continueWatching); });
-
 app.get('/api/movies', async (req, res) => { res.json(await MovieModel.find()); });
 app.get('/api/series', async (req, res) => { res.json(await SeriesModel.find()); });
 app.get('/api/anime', async (req, res) => { res.json(await AnimeModel.find()); });
@@ -130,4 +126,7 @@ app.delete('/api/admin/carousel/delete/:id', async (req, res) => { await Carouse
 app.post('/api/content/view/:id', async (req, res) => { try { const { id } = req.params; let item = await MovieModel.findOne({ id }) || await SeriesModel.findOne({ id }) || await AnimeModel.findOne({ id }); if (item) { item.views = (item.views || 0) + 1; await item.save(); res.json({ views: item.views }); } } catch (e) { res.status(500).json({ error: "Error" }); } });
 app.get('/api/admin/analytics', async (req, res) => { const movies = await MovieModel.find(); const series = await SeriesModel.find(); const anime = await AnimeModel.find(); const all = [...movies, ...series, ...anime]; const top5 = all.sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5); res.json(top5); });
 
-app.listen(PORT, () => console.log(`🚀 Cloud Server running on http://localhost:${PORT}`));
+// 👇 INCREASE TIMEOUT LIMITS FOR UPLOADS
+const server = app.listen(PORT, () => console.log(`🚀 Cloud Server running on http://localhost:${PORT}`));
+server.keepAliveTimeout = 120000; // 2 Minutes
+server.headersTimeout = 120000;   // 2 Minutes

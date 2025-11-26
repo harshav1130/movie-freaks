@@ -109,17 +109,15 @@ app.put('/api/admin/carousel/update/:id', upload.fields([{ name: 'imageFile', ma
 app.put('/api/admin/update/:id', upload.single('imageFile'), async (req, res) => { try { const { id } = req.params; const updates = req.body; if (req.file) updates.image = req.file.path; let updatedItem = await MovieModel.findOneAndUpdate({ id: id }, updates, { new: true }); if (!updatedItem) updatedItem = await SeriesModel.findOneAndUpdate({ id: id }, updates, { new: true }); if (!updatedItem) updatedItem = await AnimeModel.findOneAndUpdate({ id: id }, updates, { new: true }); res.json({ message: "Updated Successfully!", item: updatedItem }); } catch (e) { res.status(500).json({ error: "Update Failed" }); } });
 app.post('/api/admin/update-season-poster', upload.single('seasonImageFile'), async (req, res) => { try { const { contentId, seasonName } = req.body; const imageUrl = req.file.path; let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId }); const seasonIndex = item.seasons.findIndex(s => s.name === seasonName); if (seasonIndex > -1) { item.seasons[seasonIndex].image = imageUrl; item.markModified('seasons'); await item.save(); res.json({ message: "Poster Updated!" }); } } catch (e) { res.status(500).json({ error: "Failed" }); } });
 
+// 👇 NEW: DIRECT ADD ROUTE (Accepts URLs from Frontend)
 app.post('/api/admin/add-direct', async (req, res) => {
     try {
         const data = req.body;
         data.id = Math.floor(Math.random() * 100000);
         data.rating = parseFloat(data.rating);
+        if (typeof data.genres === 'string') data.genres = JSON.parse(data.genres);
         
-        if (typeof data.genres === 'string') {
-             try { data.genres = JSON.parse(data.genres); } catch(e) { data.genres = []; } 
-        }
-
-        if (data.featured === true || data.featured === 'true') {
+        if (data.featured === true) {
             await CarouselModel.create({
                 id: data.id, title: data.title, description: data.description,
                 image: data.image, tag: "New Release", videoUrl: data.videoUrl, category: data.category
@@ -135,10 +133,17 @@ app.post('/api/admin/add-direct', async (req, res) => {
         else if (data.category === 'anime') await AnimeModel.create(data);
 
         res.json({ message: "Saved Successfully!" });
-    } catch (e) { 
-        console.error(e);
-        res.status(500).json({ error: "Save Failed" }); 
-    }
+    } catch (e) { res.status(500).json({ error: "Save Failed" }); }
+});
+
+// 👇 NEW: DIRECT BANNER ADD ROUTE
+app.post('/api/admin/carousel/add-direct', async (req, res) => {
+    try {
+        const data = req.body;
+        data.id = Math.floor(Math.random() * 100000);
+        await CarouselModel.create(data);
+        res.json({ message: "Banner Saved!" });
+    } catch (e) { res.status(500).json({ error: "Failed" }); }
 });
 app.post('/api/auth/login', async (req, res) => { const { email, password } = req.body; const user = await User.findOne({ email }); if (!user || user.password !== password) return res.status(401).json({ message: 'Invalid credentials' }); res.json({ message: 'Success', user }); });
 app.post('/api/auth/signup', async (req, res) => { const { email, password } = req.body; const newUser = new User({ email, password, username: email.split('@')[0] }); await newUser.save(); res.status(201).json({ message: 'Created', user: { email } }); });

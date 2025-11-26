@@ -53,8 +53,14 @@ const AdminPage = () => {
   };
 
   const fetchAnalytics = async () => {
-       try { const res = await fetch(`${API_URL}/api/admin/analytics`); setAnalytics(await res.json()); } catch(e) {}
-  };
+    try {
+        const res = await fetch(`${API_URL}/api/admin/analytics`);
+        if (res.ok) {
+            const data = await res.json();
+            setAnalytics(data || []);
+        }
+    } catch(e) { console.error(e); }
+};
 
   // Direct Upload Helper
   const uploadToCloudinary = async (file, type) => {
@@ -300,8 +306,43 @@ const AdminPage = () => {
                 </div>
             )}
 
-            {/* (Keep Edit Item and Analytics Tabs as they were) */}
-             {/* ... */}
+{activeTab === 'analytics' && (
+                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                    <h2 style={{textAlign:'center', marginBottom:'30px'}}>Top 5 Most Watched</h2>
+                    
+                    {analytics.length === 0 ? (
+                        <div style={{textAlign:'center', color:'#777', marginTop:'50px'}}>
+                            <h3>No views yet!</h3>
+                            <p>Go watch a movie to see data appear here.</p>
+                        </div>
+                    ) : (
+                        <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                            {analytics.map((item, index) => (
+                                <div key={item.id || index} style={{display:'flex', alignItems:'center', background:'#222', padding:'15px', borderRadius:'8px', borderBottom:`4px solid ${index===0?'#e50914':'#333'}`}}>
+                                    <span style={{fontSize:'1.5rem', fontWeight:'bold', width:'40px', color:'#777'}}>#{index+1}</span>
+                                    
+                                    {/* Handle missing images safely */}
+                                    <img 
+                                        src={item.image} 
+                                        style={{width:'50px', height:'75px', objectFit:'cover', borderRadius:'4px', marginRight:'20px', backgroundColor:'#333'}} 
+                                        alt=""
+                                    />
+                                    
+                                    <div style={{flex:1}}>
+                                        <h3 style={{margin:0}}>{item.title}</h3>
+                                        <p style={{color:'#aaa', fontSize:'0.9rem', margin:'5px 0 0 0'}}>{item.category?.toUpperCase() || 'CONTENT'}</p>
+                                    </div>
+                                    
+                                    <div style={{textAlign:'right'}}>
+                                        <span style={{fontSize:'1.5rem', fontWeight:'bold', color:'#e50914'}}>{item.views || 0}</span>
+                                        <p style={{margin:0, fontSize:'0.8rem', color:'#aaa'}}>Views</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     </div>
   );

@@ -185,8 +185,29 @@ app.put('/api/admin/carousel/update-direct/:id', async (req, res) => {
 });
 app.delete('/api/admin/carousel/delete/:id', async (req, res) => { await CarouselModel.deleteOne({ id: req.params.id }); res.json({ message: "Deleted" }); });
 app.post('/api/content/view/:id', async (req, res) => { try { const { id } = req.params; let item = await MovieModel.findOne({ id }) || await SeriesModel.findOne({ id }) || await AnimeModel.findOne({ id }); if (item) { item.views = (item.views || 0) + 1; await item.save(); res.json({ views: item.views }); } } catch (e) { res.status(500).json({ error: "Error" }); } });
-app.get('/api/admin/analytics', async (req, res) => { const movies = await MovieModel.find(); const series = await SeriesModel.find(); const anime = await AnimeModel.find(); const all = [...movies, ...series, ...anime]; const top5 = all.sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5); res.json(top5); });
+app.get('/api/admin/analytics', async (req, res) => {
+    try {
+        const movies = await MovieModel.find();
+        const series = await SeriesModel.find();
+        const anime = await AnimeModel.find();
+        
+        const all = [...movies, ...series, ...anime];
 
+        // Sort by views (descending). If 'views' is missing, treat it as 0.
+        const top5 = all
+            .map(item => ({
+                ...item.toObject(), 
+                views: item.views || 0 
+            }))
+            .sort((a, b) => b.views - a.views)
+            .slice(0, 5);
+        
+        res.json(top5);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+});
 // 👇 INCREASE TIMEOUT LIMITS FOR UPLOADS
 const server = app.listen(PORT, () => console.log(`🚀 Cloud Server running on http://localhost:${PORT}`));
 server.keepAliveTimeout = 120000; // 2 Minutes

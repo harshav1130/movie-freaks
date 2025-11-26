@@ -177,7 +177,7 @@ body {
 
 /* Cards & Hover */
 .card { flex: 0 0 200px; min-width: 200px; background-color: var(--background-light); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s; cursor: pointer; position: relative; z-index: 1; }
-.card:hover { transform: scale(1.01) !important; z-index: 100; box-shadow: 0 10px 20px rgba(0,0,0,0.8); border: 2px solid #fff; }
+.card:hover { transform: scale(1.01) !important; z-index: 100; box-shadow: 0 10px 20px rgba(0,0,0,0.8); border: 2px solid #370d0d; }
 .grid-container:hover .card:not(:hover) { opacity: 0.5; filter: grayscale(50%); }
 .card-image { position: relative; padding-top: 150%; height: 0; overflow: hidden; }
 .card-image img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }

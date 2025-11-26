@@ -7,19 +7,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { v2 as cloudinary } from 'cloudinary';
 
-// 👇 ROBUST IMPORT FOR CLOUDINARY STORAGE
+// Import Cloudinary Storage safely
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const storagePkg = require('multer-storage-cloudinary');
 const CloudinaryStorage = storagePkg.CloudinaryStorage || storagePkg.default || storagePkg;
 
+// 👇 LOAD ENV FILE
 dotenv.config(); 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-// 👇 DYNAMIC PORT (Required for Cloud Deployment)
 const PORT = process.env.PORT || 3001;
 
 // 1. MIDDLEWARE
@@ -28,12 +28,19 @@ app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'images')));
 app.use('/videos', express.static(path.join(__dirname, 'videos')));
 
-// 2. CLOUDINARY CONFIG
+// 2. CLOUDINARY CONFIG & TEST
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+// 👇 CONNECTION TEST LOG
+if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    console.error("❌ CRITICAL ERROR: Cloudinary Name is missing in .env file!");
+} else {
+    console.log("✅ Cloudinary Configured for:", process.env.CLOUDINARY_CLOUD_NAME);
+}
 
 // 3. STORAGE ENGINE
 const storage = new CloudinaryStorage({
@@ -57,15 +64,11 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage: storage });
 
-// 4. DATABASE CONNECTION (DYNAMIC)
-// Use Environment Variable if available, otherwise Local
+// 4. DATABASE CONNECTION
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ottProject_Final_v7';
 
 mongoose.connect(MONGO_URI)
-  .then(() => { 
-      console.log('✅ MongoDB Connected'); 
-      seedDatabase(); 
-  })
+  .then(() => { console.log('✅ MongoDB Connected'); seedDatabase(); })
   .catch(err => console.log('❌ DB Error:', err));
 
 // 5. SCHEMAS
@@ -104,12 +107,11 @@ const seedDatabase = async () => {
             await User.create({ email: "admin@movie.com", password: "admin", username: "Admin Boss", role: "admin" });
             console.log("👑 Admin Account Created");
         }
-    } catch (err) { console.log("Seed check skipped"); }
+    } catch (e) { console.log("Seed skipped"); }
 };
 
-// 7. API ROUTES
+// 7. API ROUTES (With Better Error Logging)
 
-// ADMIN: Add Content
 app.post('/api/admin/add', 
     upload.fields([
         { name: 'imageFile', maxCount: 1 }, 
@@ -118,6 +120,8 @@ app.post('/api/admin/add',
     ]), 
     async (req, res) => {
     try {
+        console.log("📥 Upload Request Received..."); // Debug Log
+
         const data = req.body;
         data.id = Math.floor(Math.random() * 100000);
         
@@ -148,101 +152,20 @@ app.post('/api/admin/add',
         else if (data.category === 'series') await SeriesModel.create(data);
         else if (data.category === 'anime') await AnimeModel.create(data);
 
+        console.log("✅ Upload Successful!");
         res.json({ message: "Upload Successful!" });
     } catch (e) { 
-        console.error(e);
-        res.status(500).json({ error: "Upload Failed" }); 
+        console.error("❌ UPLOAD ERROR:", e); // Prints actual error to terminal
+        res.status(500).json({ error: "Upload Failed: " + e.message }); 
     }
 });
 
-// ADMIN: Add Episode
-app.post('/api/admin/add-episode', upload.single('videoFile'), async (req, res) => {
-    try {
-        const { contentId, seasonName, title, duration } = req.body;
-        const videoUrl = req.file.path; 
-        
-        const newEpisode = { title, duration, url: videoUrl };
-        let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId });
-        if (!item) return res.status(404).json({ error: "Not found" });
-
-        const seasonIndex = item.seasons.findIndex(s => s.name === seasonName);
-        if (seasonIndex > -1) {
-            item.seasons[seasonIndex].episodes.push(newEpisode);
-        } else {
-            item.seasons.push({ name: seasonName, image: item.image, episodes: [newEpisode] });
-        }
-        item.markModified('seasons'); 
-        await item.save();
-        res.json({ message: "Episode Added!", seasons: item.seasons });
-    } catch (e) { res.status(500).json({ error: "Failed" }); }
-});
-
-// ADMIN: Add Banner
-app.post('/api/admin/carousel/add', upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'videoFile', maxCount: 1 }]), async (req, res) => {
-    try {
-        const data = req.body;
-        data.id = Math.floor(Math.random() * 100000);
-        if (req.files['imageFile']) data.image = req.files['imageFile'][0].path;
-        if (req.files['videoFile']) data.videoUrl = req.files['videoFile'][0].path;
-        
-        await CarouselModel.create(data);
-        res.json({ message: "Banner Added!" });
-    } catch (e) { res.status(500).json({ error: "Failed" }); }
-});
-
-// ADMIN: Update Banner
-app.put('/api/admin/carousel/update/:id', upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'videoFile', maxCount: 1 }]), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updates = req.body;
-        if (req.files['imageFile']) updates.image = req.files['imageFile'][0].path;
-        if (req.files['videoFile']) updates.videoUrl = req.files['videoFile'][0].path;
-        await CarouselModel.findOneAndUpdate({ id: id }, updates);
-        res.json({ message: "Banner Updated!" });
-    } catch (e) { res.status(500).json({ error: "Update Failed" }); }
-});
-
-// ADMIN: Update Content
-app.put('/api/admin/update/:id', upload.single('imageFile'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updates = req.body; 
-        if (req.file) updates.image = req.file.path;
-        
-        let updatedItem = await MovieModel.findOneAndUpdate({ id: id }, updates, { new: true });
-        if (!updatedItem) updatedItem = await SeriesModel.findOneAndUpdate({ id: id }, updates, { new: true });
-        if (!updatedItem) updatedItem = await AnimeModel.findOneAndUpdate({ id: id }, updates, { new: true });
-
-        res.json({ message: "Updated Successfully!", item: updatedItem });
-    } catch (e) { res.status(500).json({ error: "Update Failed" }); }
-});
-
-// ADMIN: Update Season Poster
-app.post('/api/admin/update-season-poster', upload.single('seasonImageFile'), async (req, res) => {
-    try {
-        const { contentId, seasonName } = req.body;
-        const imageUrl = req.file.path;
-        let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId });
-        const seasonIndex = item.seasons.findIndex(s => s.name === seasonName);
-        
-        if (seasonIndex > -1) {
-            item.seasons[seasonIndex].image = imageUrl;
-            item.markModified('seasons');
-            await item.save();
-            res.json({ message: "Poster Updated!" });
-        }
-    } catch (e) { res.status(500).json({ error: "Failed" }); }
-});
-
-// Standard User Routes
-app.post('/api/auth/login', async (req, res) => { const { email, password } = req.body; const user = await User.findOne({ email }); if (!user || user.password !== password) return res.status(401).json({ message: 'Invalid credentials' }); res.json({ message: 'Success', user }); });
-app.post('/api/auth/signup', async (req, res) => { const { email, password } = req.body; const newUser = new User({ email, password, username: email.split('@')[0] }); await newUser.save(); res.status(201).json({ message: 'Created', user: { email } }); });
-app.get('/api/user/:email', async (req, res) => { const user = await User.findOne({ email: req.params.email }); res.json(user || {}); });
-app.put('/api/user/update', async (req, res) => { const user = await User.findOne({ email: req.body.email }); if(user){ user.username=req.body.newUsername; user.password=req.body.newPassword; await user.save(); res.json({message:"Updated", username:user.username}); }});
-app.post('/api/user/watchlist', async (req, res) => { const user = await User.findOne({email:req.body.email}); if(!user.watchlist.find(i=>i.id===req.body.item.id)){ user.watchlist.push(req.body.item); await user.save(); } res.json(user.watchlist); });
-app.post('/api/user/watchlist/remove', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.watchlist = user.watchlist.filter(i=>i.id!==req.body.item.id); await user.save(); res.json(user.watchlist); });
-app.post('/api/user/history', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.continueWatching=user.continueWatching.filter(i=>i.id!==req.body.item.id); user.continueWatching.unshift(req.body.item); await user.save(); res.json(user.continueWatching); });
-app.post('/api/user/history/remove', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.continueWatching=user.continueWatching.filter(i=>i.id!==req.body.item.id); await user.save(); res.json(user.continueWatching); });
+// ... (Keep other routes exactly as before: login, signup, user, watchlist, history, episodes, banner, delete) ...
+app.post('/api/admin/add-episode', upload.single('videoFile'), async (req, res) => { try { const { contentId, seasonName, title, duration } = req.body; const videoUrl = req.file.path; const newEpisode = { title, duration, url: videoUrl }; let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId }); if (!item) return res.status(404).json({ error: "Not found" }); const seasonIndex = item.seasons.findIndex(s => s.name === seasonName); if (seasonIndex > -1) { item.seasons[seasonIndex].episodes.push(newEpisode); } else { item.seasons.push({ name: seasonName, image: item.image, episodes: [newEpisode] }); } item.markModified('seasons'); await item.save(); res.json({ message: "Episode Added!", seasons: item.seasons }); } catch (e) { res.status(500).json({ error: "Failed" }); } });
+app.post('/api/admin/carousel/add', upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'videoFile', maxCount: 1 }]), async (req, res) => { try { const data = req.body; data.id = Math.floor(Math.random() * 100000); if (req.files['imageFile']) data.image = req.files['imageFile'][0].path; if (req.files['videoFile']) data.videoUrl = req.files['videoFile'][0].path; await CarouselModel.create(data); res.json({ message: "Banner Added!" }); } catch (e) { res.status(500).json({ error: "Failed" }); } });
+app.put('/api/admin/carousel/update/:id', upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'videoFile', maxCount: 1 }]), async (req, res) => { try { const { id } = req.params; const updates = req.body; if (req.files['imageFile']) updates.image = req.files['imageFile'][0].path; if (req.files['videoFile']) updates.videoUrl = req.files['videoFile'][0].path; await CarouselModel.findOneAndUpdate({ id: id }, updates); res.json({ message: "Banner Updated!" }); } catch (e) { res.status(500).json({ error: "Update Failed" }); } });
+app.put('/api/admin/update/:id', upload.single('imageFile'), async (req, res) => { try { const { id } = req.params; const updates = req.body; if (req.file) updates.image = req.file.path; let updatedItem = await MovieModel.findOneAndUpdate({ id: id }, updates, { new: true }); if (!updatedItem) updatedItem = await SeriesModel.findOneAndUpdate({ id: id }, updates, { new: true }); if (!updatedItem) updatedItem = await AnimeModel.findOneAndUpdate({ id: id }, updates, { new: true }); res.json({ message: "Updated Successfully!", item: updatedItem }); } catch (e) { res.status(500).json({ error: "Update Failed" }); } });
+app.post('/api/admin/update-season-poster', upload.single('seasonImageFile'), async (req, res) => { try { const { contentId, seasonName } = req.body; const imageUrl = req.file.path; let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId }); const seasonIndex = item.seasons.findIndex(s => s.name === seasonName); if (seasonIndex > -1) { item.seasons[seasonIndex].image = imageUrl; item.markModified('seasons'); await item.save(); res.json({ message: "Poster Updated!" }); } } catch (e) { res.status(500).json({ error: "Failed" }); } });
 
 app.get('/api/movies', async (req, res) => { res.json(await MovieModel.find()); });
 app.get('/api/series', async (req, res) => { res.json(await SeriesModel.find()); });
@@ -252,5 +175,13 @@ app.delete('/api/admin/delete/:id', async (req, res) => { await MovieModel.delet
 app.delete('/api/admin/carousel/delete/:id', async (req, res) => { await CarouselModel.deleteOne({ id: req.params.id }); res.json({ message: "Deleted" }); });
 app.post('/api/content/view/:id', async (req, res) => { try { const { id } = req.params; let item = await MovieModel.findOne({ id }) || await SeriesModel.findOne({ id }) || await AnimeModel.findOne({ id }); if (item) { item.views = (item.views || 0) + 1; await item.save(); res.json({ views: item.views }); } } catch (e) { res.status(500).json({ error: "Error" }); } });
 app.get('/api/admin/analytics', async (req, res) => { const movies = await MovieModel.find(); const series = await SeriesModel.find(); const anime = await AnimeModel.find(); const all = [...movies, ...series, ...anime]; const top5 = all.sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5); res.json(top5); });
+app.post('/api/auth/login', async (req, res) => { const { email, password } = req.body; const user = await User.findOne({ email }); if (!user || user.password !== password) return res.status(401).json({ message: 'Invalid credentials' }); res.json({ message: 'Success', user }); });
+app.post('/api/auth/signup', async (req, res) => { const { email, password } = req.body; const newUser = new User({ email, password, username: email.split('@')[0] }); await newUser.save(); res.json({ message: 'Created', user: { email } }); });
+app.get('/api/user/:email', async (req, res) => { const user = await User.findOne({ email: req.params.email }); res.json(user || {}); });
+app.put('/api/user/update', async (req, res) => { await User.updateOne({email: req.body.email}, {username: req.body.newUsername, password: req.body.newPassword}); res.json({message:"Updated"}); });
+app.post('/api/user/watchlist', async (req, res) => { const user = await User.findOne({email:req.body.email}); if(!user.watchlist.find(i=>i.id===req.body.item.id)){ user.watchlist.push(req.body.item); await user.save(); } res.json(user.watchlist); });
+app.post('/api/user/watchlist/remove', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.watchlist = user.watchlist.filter(i=>i.id!==req.body.item.id); await user.save(); res.json(user.watchlist); });
+app.post('/api/user/history', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.continueWatching=user.continueWatching.filter(i=>i.id!==req.body.item.id); user.continueWatching.unshift(req.body.item); await user.save(); res.json(user.continueWatching); });
+app.post('/api/user/history/remove', async (req, res) => { const user = await User.findOne({email:req.body.email}); user.continueWatching=user.continueWatching.filter(i=>i.id!==req.body.item.id); await user.save(); res.json(user.continueWatching); });
 
 app.listen(PORT, () => console.log(`🚀 Cloud Server running on http://localhost:${PORT}`));

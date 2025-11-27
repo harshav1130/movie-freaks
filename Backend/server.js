@@ -217,7 +217,35 @@ app.put('/api/admin/carousel/update-direct/:id', async (req, res) => {
     }
 });
 app.delete('/api/admin/carousel/delete/:id', async (req, res) => { await CarouselModel.deleteOne({ id: req.params.id }); res.json({ message: "Deleted" }); });
-app.post('/api/content/view/:id', async (req, res) => { try { const { id } = req.params; let item = await MovieModel.findOne({ id }) || await SeriesModel.findOne({ id }) || await AnimeModel.findOne({ id }); if (item) { item.views = (item.views || 0) + 1; await item.save(); res.json({ views: item.views }); } } catch (e) { res.status(500).json({ error: "Error" }); } });
+app.post('/api/content/view/:id', async (req, res) => {
+    try {
+        // 1. Parse ID safely
+        const idParam = req.params.id;
+        const numericId = parseInt(idParam);
+        
+        // 2. Build Query: Check for both String ID (if from DB) and Number ID (if seeded)
+        const query = isNaN(numericId) ? { _id: idParam } : { id: numericId };
+
+        // 3. Search in all collections
+        let item = await MovieModel.findOne(query) || 
+                   await SeriesModel.findOne(query) || 
+                   await AnimeModel.findOne(query);
+
+        if (item) {
+            // 4. Increment
+            item.views = (item.views || 0) + 1;
+            await item.save();
+            console.log(`👁️ View +1 for: ${item.title} (Total: ${item.views})`);
+            res.json({ views: item.views });
+        } else {
+            console.log("❌ Content not found for view count:", idParam);
+            res.status(404).json({ error: "Item not found" });
+        }
+    } catch (e) { 
+        console.error("View Count Error:", e);
+        res.status(500).json({ error: "Error" }); 
+    }
+});
 app.get('/api/admin/analytics', async (req, res) => {
     try {
         const movies = await MovieModel.find();

@@ -161,31 +161,35 @@ const AdminPage = () => {
   const handleDeleteBanner = async (id) => { if(!confirm("Delete?")) return; await fetch(`${API_URL}/api/admin/carousel/delete/${id}`, {method:'DELETE'}); fetchCarousel(); };
   
   const handleUpdateDetails = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('title', editingItem.title); formData.append('description', editingItem.description); formData.append('year', editingItem.year); formData.append('cast', editingItem.cast); const fileInput = document.getElementById('editImageInput'); if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]); await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData }); alert("Updated!"); setResetKey(Date.now()); setUploading(false); fetchAll(); };
-  // 👇 UPDATED: Direct Upload for Episodes
-  const handleAddEpisode = async (e) => {
+ // 👇 UPDATED: Direct Upload for Episodes
+ const handleAddEpisode = async (e) => {
     e.preventDefault(); 
-    setUploading(true); 
-    setUploadProgress("Uploading Episode..."); // Visual feedback
+    setUploading(true);
+    setUploadProgress("Uploading Episode Video to Cloud..."); // Visual feedback
 
     try {
         const fileInput = document.getElementById('episodeVideoInput');
-        if (!fileInput.files[0]) { 
+        const file = fileInput?.files[0];
+
+        if (!file) { 
             alert("Please select a video file"); 
             setUploading(false); 
             return; 
         }
-        
-        // 1. Upload to Cloudinary DIRECTLY
-        const vidUrl = await uploadToCloudinary(fileInput.files[0], 'video');
-        
-        // 2. Prepare Data
+
+        // 1. Upload Video to Cloudinary DIRECTLY (Bypasses Server Limit)
+        const vidUrl = await uploadToCloudinary(file, 'video');
+
+        // 2. Prepare Data (Send URL, not file)
         const payload = { 
             contentId: editingItem.id, 
             seasonName: episodeForm.seasonName, 
             title: episodeForm.title, 
             duration: episodeForm.duration, 
-            videoUrl: vidUrl // Send the link, not the file
+            videoUrl: vidUrl 
         };
+
+        setUploadProgress("Saving Details...");
         
         // 3. Send to Backend (New Route)
         const res = await fetch(`${API_URL}/api/admin/add-episode-direct`, { 
@@ -193,23 +197,26 @@ const AdminPage = () => {
             headers: {'Content-Type':'application/json'}, 
             body: JSON.stringify(payload) 
         });
-        
+
         if(res.ok) { 
-            alert("✅ Episode Added!"); 
-            setResetKey(Date.now()); // Clear input
+            // 👇 The specific message you asked for
+            alert("✅ Upload Episode Successfully!"); 
             
-            // Refresh the list so you see the new episode immediately
-            // (Triggering a dummy fetch to force refresh logic)
-            await fetch(`${API_URL}/api/user/dummy`).catch(() => {}); 
+            setResetKey(Date.now()); // Clear input
+            setEpisodeForm({ seasonName: 'Season 1', title: '', duration: '' }); // Reset text inputs
+            
+            // Refresh data
             fetchAll(); 
         } else {
-            alert("Backend failed to save episode.");
+            alert("Failed to save episode details to database.");
         }
     } catch(e){ 
-        console.error(e);
+        console.error(e); 
         alert("Error uploading episode: " + e.message); 
     } 
+    
     setUploading(false); 
+    setUploadProgress("");
 };
   
   const handleUpdateSeasonPoster = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('contentId', editingItem.id); formData.append('seasonName', seasonPosterForm.seasonName); const fileInput = document.getElementById('seasonPosterInput'); if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; } const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData }); if(res.ok) { alert("Poster Updated!"); setResetKey(Date.now()); fetchAll(); } setUploading(false); };

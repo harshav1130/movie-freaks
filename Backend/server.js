@@ -204,6 +204,7 @@ app.post('/api/admin/carousel/add-direct', async (req, res) => {
     }
 });
 
+// 👇 NEW: DIRECT EPISODE ADD (JSON Only)
 app.post('/api/admin/add-episode-direct', async (req, res) => {
     try {
         const { contentId, seasonName, title, duration, videoUrl } = req.body;
@@ -223,7 +224,7 @@ app.post('/api/admin/add-episode-direct', async (req, res) => {
             // Add to existing season
             item.seasons[seasonIndex].episodes.push(newEpisode);
         } else {
-            // Create new season if it doesn't exist (Safety fallback)
+            // Create new season if it doesn't exist
             item.seasons.push({ name: seasonName, image: item.image, episodes: [newEpisode] });
         }
 

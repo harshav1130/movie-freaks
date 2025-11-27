@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify'; // 👈 IMPORT TOAST
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
-import { API_URL } from './config'; 
+import { API_URL } from './config';
 
 // Components
 import IntroScreen from './components/IntroScreen';
@@ -16,7 +16,7 @@ import AdminPage from './components/AdminPage';
 const App = () => {
   const [showIntro, setShowIntro] = useState(true);
   
-  // 👇 FIX: Initialize State directly from Local Storage
+  // User State
   const [user, setUser] = useState(() => {
       const savedUser = localStorage.getItem('mf_user');
       return savedUser ? JSON.parse(savedUser) : null;
@@ -49,13 +49,12 @@ const App = () => {
 
   useEffect(() => {
     if (user) {
-      setShowIntro(false); // Skip intro if logged in
+      setShowIntro(false);
       fetchAllContent();
       fetchUserData(); 
     }
   }, [user?.email]);
 
-  // 👇 SYNC DATA ON REFRESH
   const fetchUserData = async () => {
       if (!user?.email) return;
       try {
@@ -64,12 +63,8 @@ const App = () => {
           if (res.ok) {
               setMyList(data.watchlist);
               setHistory(data.continueWatching);
-              
-              // Update Local Storage silently to keep it fresh
               const updatedUser = { ...user, ...data };
               localStorage.setItem('mf_user', JSON.stringify(updatedUser));
-              
-              // Only update state if role changed (avoids re-renders)
               if (user.role !== data.role) setUser(updatedUser);
           }
       } catch (e) { console.error("Failed to sync user data"); }
@@ -80,13 +75,10 @@ const App = () => {
     try {
       const resMovies = await fetch(`${API_URL}/api/movies`);
       setMovies(await resMovies.json());
-
       const resSeries = await fetch(`${API_URL}/api/series`);
       setSeries(await resSeries.json());
-
       const resAnime = await fetch(`${API_URL}/api/anime`);
       setAnime(await resAnime.json());
-
       setTimeout(() => setLoading(false), 800); 
     } catch (err) { console.error(err); setLoading(false); }
   };
@@ -112,33 +104,36 @@ const App = () => {
         const res = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) });
         const data = await res.json();
         if(res.ok) { 
-            // 👇 Save to Local Storage FIRST
             localStorage.setItem('mf_user', JSON.stringify(data.user)); 
             setUser(data.user); 
             setMyList(data.user.watchlist);
             setHistory(data.user.continueWatching); 
             setShowSignIn(false); 
-        } else { alert(data.message); }
-    } catch(e) { alert("Network Error"); }
+            toast.success(`Welcome back, ${data.user.username}!`); // 👈 TOAST
+        } else { toast.error(data.message); }
+    } catch(e) { toast.error("Network Error"); }
   };
 
   const handleSignup = async (e) => {
     e.preventDefault();
     try {
         const res = await fetch(`${API_URL}/api/auth/signup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) });
-        if(res.ok) { handleLogin(e); setShowSignUp(false); } 
-        else { alert("Signup failed"); }
-    } catch(e) { alert("Network Error"); }
+        if(res.ok) { 
+            toast.success("Account created! Logging in..."); // 👈 TOAST
+            handleLogin(e); 
+            setShowSignUp(false); 
+        } else { toast.error("Signup failed"); }
+    } catch(e) { toast.error("Network Error"); }
   };
 
   const handleLogout = () => {
-    // 👇 CLEAR STORAGE
     localStorage.removeItem('mf_user');
     setUser(null);
     setShowIntro(true);
     setMyList([]);
     setHistory([]);
     setSearchTerm('');
+    toast.info("Logged out successfully"); // 👈 TOAST
     navigate('/');
   };
 
@@ -148,26 +143,30 @@ const App = () => {
           const res = await fetch(`${API_URL}/api/user/update`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, newUsername, newPassword }) });
           const data = await res.json();
           if (res.ok) {
-              alert("Profile Updated!");
+              toast.success("Profile Updated!"); // 👈 TOAST
               const updatedUser = { ...user, username: data.username };
               setUser(updatedUser);
-              localStorage.setItem('mf_user', JSON.stringify(updatedUser)); // Update storage
+              localStorage.setItem('mf_user', JSON.stringify(updatedUser));
               setShowSettings(false);
           }
-      } catch(e) { alert("Update failed"); }
+      } catch(e) { toast.error("Update failed"); }
   };
 
   const addToWatchlist = async (item) => {
       if (!myList.find(i => i.id === item.id)) {
           const newList = [...myList, item];
           setMyList(newList);
+          toast.success("Added to My List"); // 👈 TOAST
           await fetch(`${API_URL}/api/user/watchlist`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, item }) });
+      } else {
+          toast.info("Already in My List");
       }
   };
 
   const removeFromWatchlist = async (item) => {
     const newList = myList.filter(i => i.id !== item.id);
     setMyList(newList);
+    toast.info("Removed from My List"); // 👈 TOAST
     try {
         await fetch(`${API_URL}/api/user/watchlist/remove`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, item }) });
         const updatedUser = { ...user, watchlist: newList };
@@ -178,6 +177,7 @@ const App = () => {
   const removeFromHistory = async (item) => {
     const newHistory = history.filter(i => i.id !== item.id);
     setHistory(newHistory);
+    toast.info("Removed from History"); // 👈 TOAST
     try {
         await fetch(`${API_URL}/api/user/history/remove`, { 
             method: 'POST', headers: {'Content-Type': 'application/json'}, 
@@ -203,6 +203,7 @@ const App = () => {
   if (showIntro && !user) return <IntroScreen onComplete={() => setShowIntro(false)} />;
   if (!user) return ( 
       <div className="landing-content">
+        <ToastContainer position="top-center" theme="dark" /> {/* 👈 Added Toast here too */}
         <header className="landing-header"><div className="logo">Movie Freaks</div><button className="btn btn-red" onClick={() => setShowSignIn(true)}>Sign In</button></header>
         <section className="hero-landing"><div className="hero-content-landing"><h1>Unlimited movies, TV shows, and more.</h1><h2>Watch anywhere. Cancel anytime.</h2><p>Ready to watch? Enter your email to create or restart your membership.</p><div className="email-form"><input type="email" placeholder="Email address" onChange={(e) => setEmail(e.target.value)} /><button className="btn btn-red btn-large" onClick={() => setShowSignUp(true)}>Get Started &gt;</button></div></div></section>
         <footer className="landing-footer"><p>Questions? Call 1-800-MOVIE-FREAKS</p><div className="footer-links"><a href="#">FAQ</a><a href="#">Help Center</a><a href="#">Terms of Use</a><a href="#">Privacy</a></div></footer>

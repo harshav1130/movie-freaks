@@ -204,6 +204,40 @@ app.post('/api/admin/carousel/add-direct', async (req, res) => {
     }
 });
 
+app.post('/api/admin/add-episode-direct', async (req, res) => {
+    try {
+        const { contentId, seasonName, title, duration, videoUrl } = req.body;
+
+        // 1. Find the Series or Anime
+        let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId });
+        
+        if (!item) return res.status(404).json({ error: "Series/Anime not found" });
+
+        // 2. Create Episode Object
+        const newEpisode = { title, duration, url: videoUrl };
+
+        // 3. Find Season
+        const seasonIndex = item.seasons.findIndex(s => s.name === seasonName);
+
+        if (seasonIndex > -1) {
+            // Add to existing season
+            item.seasons[seasonIndex].episodes.push(newEpisode);
+        } else {
+            // Create new season if it doesn't exist (Safety fallback)
+            item.seasons.push({ name: seasonName, image: item.image, episodes: [newEpisode] });
+        }
+
+        // 4. Save
+        item.markModified('seasons'); 
+        await item.save();
+
+        res.json({ message: "Episode Added Successfully!" });
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: "Failed to add episode" }); 
+    }
+});
+
 // 👇 NEW: DIRECT CAROUSEL UPDATE
 app.put('/api/admin/carousel/update-direct/:id', async (req, res) => {
     try {

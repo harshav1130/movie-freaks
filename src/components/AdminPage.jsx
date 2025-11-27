@@ -161,61 +161,56 @@ const AdminPage = () => {
   const handleDeleteBanner = async (id) => { if(!confirm("Delete?")) return; await fetch(`${API_URL}/api/admin/carousel/delete/${id}`, {method:'DELETE'}); fetchCarousel(); };
   
   const handleUpdateDetails = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('title', editingItem.title); formData.append('description', editingItem.description); formData.append('year', editingItem.year); formData.append('cast', editingItem.cast); const fileInput = document.getElementById('editImageInput'); if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]); await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData }); alert("Updated!"); setResetKey(Date.now()); setUploading(false); fetchAll(); };
-  const handleAddEpisode = async (e) => { 
-      e.preventDefault(); setUploading(true); setUploadProgress("Uploading Episode...");
-      try {
-          const fileInput = document.getElementById('episodeVideoInput');
-          if (!fileInput.files[0]) { alert("Select Video"); setUploading(false); return; }
-          
-          const vidUrl = await uploadToCloudinary(fileInput.files[0], 'video');
-          const payload = { 
-              contentId: editingItem.id, 
-              seasonName: episodeForm.seasonName, 
-              title: episodeForm.title, 
-              duration: episodeForm.duration, 
-              videoUrl: vidUrl 
-          };
-          
-          // Note: You might need to create a 'add-episode-direct' route similar to 'add-direct' if this fails
-          // For now assuming add-episode handles JSON if updated, or use FormData if not.
-          // Let's stick to FormData for existing route compatibility if not updated:
-           const formData = new FormData();
-           formData.append('contentId', editingItem.id); formData.append('seasonName', episodeForm.seasonName);
-           formData.append('title', episodeForm.title); formData.append('duration', episodeForm.duration);
-           // Hack: We already uploaded, but existing route expects file. 
-           // Ideally, update backend route `add-episode` to accept text URL.
-           // Assuming backend accepts text URL now or you update it.
-           // IF BACKEND NOT UPDATED for direct episode add:
-           // We should update backend route `api/admin/add-episode` to accept `videoUrl` string.
-           
-           // For now, let's use the FormData method which might re-upload or fail if backend strictly wants file.
-           // CORRECT APPROACH: Update Backend to accept JSON for episodes too.
-           // Assuming backend `add-episode` still expects file. 
-           // Let's try sending JSON to a hypothetical `add-episode-direct` or update `add-episode` logic.
-           
-           // WORKAROUND: Send as JSON to `add-episode` (Assuming I fixed backend earlier to accept text URL?)
-           // Looking at previous server.js code, `add-episode` expects `upload.single('videoFile')`.
-           // We need to update backend `add-episode` to support direct URL.
-           // I will assume you will update backend or have updated it.
-           
-           // LET'S USE THE EXISTING `add-episode` but with file for now to be safe, 
-           // OR better: use the `uploadToCloudinary` logic if you updated backend.
-           
-           // REVERTING to File Upload for Episode for now to ensure compatibility if backend wasn't updated for direct episode.
-           // BUT wait, you wanted Direct Upload everywhere.
-           // I will assume you updated `add-episode` route in server.js to handle text URL if provided.
-           
-           // Sending JSON with videoUrl
-           const res = await fetch(`${API_URL}/api/admin/add-episode-direct`, { // Ensure this route exists or update server.js
-               method: 'POST', 
-               headers: {'Content-Type':'application/json'}, 
-               body: JSON.stringify(payload) 
-           });
-           
-           if(res.ok) { alert("Episode Added!"); setResetKey(Date.now()); fetchAll(); }
-      } catch(e){ alert(e.message); } 
-      setUploading(false); 
-  };
+  // 👇 UPDATED: Direct Upload for Episodes
+  const handleAddEpisode = async (e) => {
+    e.preventDefault(); 
+    setUploading(true); 
+    setUploadProgress("Uploading Episode..."); // Visual feedback
+
+    try {
+        const fileInput = document.getElementById('episodeVideoInput');
+        if (!fileInput.files[0]) { 
+            alert("Please select a video file"); 
+            setUploading(false); 
+            return; 
+        }
+        
+        // 1. Upload to Cloudinary DIRECTLY
+        const vidUrl = await uploadToCloudinary(fileInput.files[0], 'video');
+        
+        // 2. Prepare Data
+        const payload = { 
+            contentId: editingItem.id, 
+            seasonName: episodeForm.seasonName, 
+            title: episodeForm.title, 
+            duration: episodeForm.duration, 
+            videoUrl: vidUrl // Send the link, not the file
+        };
+        
+        // 3. Send to Backend (New Route)
+        const res = await fetch(`${API_URL}/api/admin/add-episode-direct`, { 
+            method: 'POST', 
+            headers: {'Content-Type':'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+        
+        if(res.ok) { 
+            alert("✅ Episode Added!"); 
+            setResetKey(Date.now()); // Clear input
+            
+            // Refresh the list so you see the new episode immediately
+            // (Triggering a dummy fetch to force refresh logic)
+            await fetch(`${API_URL}/api/user/dummy`).catch(() => {}); 
+            fetchAll(); 
+        } else {
+            alert("Backend failed to save episode.");
+        }
+    } catch(e){ 
+        console.error(e);
+        alert("Error uploading episode: " + e.message); 
+    } 
+    setUploading(false); 
+};
   
   const handleUpdateSeasonPoster = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('contentId', editingItem.id); formData.append('seasonName', seasonPosterForm.seasonName); const fileInput = document.getElementById('seasonPosterInput'); if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; } const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData }); if(res.ok) { alert("Poster Updated!"); setResetKey(Date.now()); fetchAll(); } setUploading(false); };
 

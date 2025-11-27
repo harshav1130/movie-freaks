@@ -239,6 +239,38 @@ app.post('/api/admin/add-episode-direct', async (req, res) => {
     }
 });
 
+// 👇 NEW: DELETE SPECIFIC EPISODE
+app.post('/api/admin/episode/delete', async (req, res) => {
+    try {
+        const { contentId, seasonName, episodeTitle } = req.body;
+
+        // 1. Find Item
+        let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId });
+        if (!item) return res.status(404).json({ error: "Content not found" });
+
+        // 2. Find Season
+        const season = item.seasons.find(s => s.name === seasonName);
+        if (!season) return res.status(404).json({ error: "Season not found" });
+
+        // 3. Filter out the specific episode
+        const initialLength = season.episodes.length;
+        season.episodes = season.episodes.filter(ep => ep.title !== episodeTitle);
+
+        if (season.episodes.length === initialLength) {
+            return res.status(404).json({ error: "Episode not found" });
+        }
+
+        // 4. Save
+        item.markModified('seasons');
+        await item.save();
+
+        res.json({ message: "Episode Deleted!", seasons: item.seasons });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Failed to delete episode" });
+    }
+});
+
 // 👇 NEW: DIRECT CAROUSEL UPDATE
 app.put('/api/admin/carousel/update-direct/:id', async (req, res) => {
     try {

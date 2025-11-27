@@ -5,9 +5,9 @@ import { API_URL } from '../config';
 
 const GENRES = ["Action", "Sci-Fi", "Drama", "Comedy", "Horror", "Thriller", "Romance", "Animation", "Fantasy", "Adventure"];
 
-// 👇 REPLACE WITH YOUR ACTUAL CLOUDINARY KEYS
-const CLOUD_NAME = "djlfj4upe";
-const UPLOAD_PRESET = "UPLOAD_PRESET"; // Replace with your actual unsigned preset name
+// CLOUDINARY KEYS
+const CLOUD_NAME = "djlfj4upe"; 
+const UPLOAD_PRESET = "UPLOAD_PRESET"; 
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -18,25 +18,22 @@ const AdminPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
-  
-  // New Key to force-reset file inputs
   const [resetKey, setResetKey] = useState(Date.now());
 
-  // --- ADD FORM STATE ---
+  // Forms
   const [addFormData, setAddFormData] = useState({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [files, setFiles] = useState({ image: null, video: null, trailer: null });
   
-  // --- EDIT & MANAGE STATE ---
+  // Edit & Banner
   const [editingItem, setEditingItem] = useState(null);
+  const [bannerForm, setBannerForm] = useState({ title: '', description: '', tag: 'Featured', videoUrl: '' });
+  const [bannerFiles, setBannerFiles] = useState({ image: null, video: null });
+  const [editingBanner, setEditingBanner] = useState(null);
+  
+  // Episode Form
   const [episodeForm, setEpisodeForm] = useState({ seasonName: 'Season 1', title: '', duration: '' });
   const [seasonPosterForm, setSeasonPosterForm] = useState({ seasonName: 'Season 1' });
-
-  // --- BANNER STATE ---
-  const [bannerForm, setBannerForm] = useState({ title: '', description: '', tag: 'Featured', videoUrl: '' });
-  const [bannerImageFile, setBannerImageFile] = useState(null);
-  const [bannerVideoFile, setBannerVideoFile] = useState(null);
-  const [editingBanner, setEditingBanner] = useState(null);
 
   useEffect(() => { fetchAll(); fetchCarousel(); fetchAnalytics(); }, []);
 
@@ -50,16 +47,10 @@ const AdminPage = () => {
         setContentList([...(m||[]), ...(s||[]), ...(a||[])]);
       } catch (e) { console.error(e); }
   };
-  
-  const fetchCarousel = async () => {
-      try { const res = await fetch(`${API_URL}/api/carousel`); setCarouselList(await res.json()); } catch (e) {}
-  };
 
-  const fetchAnalytics = async () => {
-       try { const res = await fetch(`${API_URL}/api/admin/analytics`); setAnalytics(await res.json()); } catch(e) {}
-  };
+  const fetchCarousel = async () => { try { const res = await fetch(`${API_URL}/api/carousel`); setCarouselList(await res.json()); } catch (e) {} };
+  const fetchAnalytics = async () => { try { const res = await fetch(`${API_URL}/api/admin/analytics`); setAnalytics(await res.json()); } catch(e) {} };
 
-  // 👇 DIRECT UPLOAD HELPER
   const uploadToCloudinary = async (file, type) => {
       if (!file) return null;
       const formData = new FormData();
@@ -67,157 +58,93 @@ const AdminPage = () => {
       formData.append("upload_preset", UPLOAD_PRESET);
       formData.append("cloud_name", CLOUD_NAME);
       formData.append("resource_type", type);
-
       try {
           const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`, { method: "POST", body: formData });
           const data = await res.json();
           if (data.error) throw new Error(data.error.message);
           return data.secure_url;
       } catch (error) {
-          console.error("Cloudinary Error:", error);
-          alert(`Upload Failed: ${error.message}`);
-          throw error;
+          alert(`Upload Failed: ${error.message}`); throw error;
       }
   };
 
   // --- HANDLERS ---
-  const handleGenreToggle = (genre) => {
-      if (selectedGenres.includes(genre)) setSelectedGenres(selectedGenres.filter(g => g !== genre));
-      else setSelectedGenres([...selectedGenres, genre]);
-  };
 
-  const handleDelete = async (id) => {
-      if(!confirm("Permanently Delete this content?")) return;
-      await fetch(`${API_URL}/api/admin/delete/${id}`, { method: 'DELETE' });
-      fetchAll();
+  // 👇 NEW: DELETE EPISODE HANDLER ADDED HERE
+  const handleDeleteEpisode = async (seasonName, episodeTitle) => {
+      if (!confirm(`Delete "${episodeTitle}" from ${seasonName}?`)) return;
+      try {
+          const res = await fetch(`${API_URL}/api/admin/episode/delete`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  contentId: editingItem.id,
+                  seasonName: seasonName,
+                  episodeTitle: episodeTitle
+              })
+          });
+          if (res.ok) {
+              const data = await res.json();
+              alert("Episode Deleted!");
+              setEditingItem({ ...editingItem, seasons: data.seasons }); // Update UI immediately
+              fetchAll();
+          } else { alert("Failed to delete episode."); }
+      } catch (e) { console.error(e); alert("Error deleting episode."); }
   };
 
   const handleAddSubmit = async (e) => {
     e.preventDefault(); setUploading(true); setUploadProgress("Processing...");
-
     try {
-        setUploadProgress("Uploading Image...");
+        setUploadProgress("Uploading Files...");
         const imageUrl = files.image ? await uploadToCloudinary(files.image, 'image') : "";
-        
-        setUploadProgress("Uploading Video (May take time)...");
         const videoUrl = files.video ? await uploadToCloudinary(files.video, 'video') : "";
         const trailerUrl = files.trailer ? await uploadToCloudinary(files.trailer, 'video') : videoUrl;
-
-        const payload = {
-            ...addFormData,
-            genres: JSON.stringify(selectedGenres),
-            image: imageUrl,
-            videoUrl: videoUrl,
-            trailerUrl: trailerUrl
-        };
-
-        setUploadProgress("Saving...");
+        const payload = { ...addFormData, genres: JSON.stringify(selectedGenres), image: imageUrl, videoUrl: videoUrl, trailerUrl: trailerUrl };
         const res = await fetch(`${API_URL}/api/admin/add-direct`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-
-        if (res.ok) {
-            alert("✅ Content Uploaded!");
-            setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
-            setSelectedGenres([]); setFiles({ image: null, video: null, trailer: null });
-            setResetKey(Date.now());
-            fetchAll(); setActiveTab('manage');
-        } else alert("Backend failed to save.");
-    } catch (err) { alert("Error during upload."); } finally { setUploading(false); setUploadProgress(""); }
+        if (res.ok) { alert("✅ Content Uploaded!"); setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false }); setSelectedGenres([]); setFiles({ image: null, video: null, trailer: null }); setResetKey(Date.now()); fetchAll(); setActiveTab('manage'); } else alert("Backend failed.");
+    } catch (err) { alert("Error"); } finally { setUploading(false); setUploadProgress(""); }
   };
 
   const handleBannerSubmit = async (e) => {
       e.preventDefault(); setUploading(true); setUploadProgress("Uploading...");
-      
       try {
-        let imageUrl = editingBanner?.image || "";
-        let videoUrl = editingBanner?.videoUrl || "";
-
-        if (bannerImageFile) imageUrl = await uploadToCloudinary(bannerImageFile, 'image');
-        if (bannerVideoFile) videoUrl = await uploadToCloudinary(bannerVideoFile, 'video');
-
-        const payload = { ...bannerForm, image: imageUrl, videoUrl };
-        
-        let url = `${API_URL}/api/admin/carousel/add-direct`;
-        let method = 'POST';
-        if (editingBanner) {
-            url = `${API_URL}/api/admin/carousel/update-direct/${editingBanner.id}`;
-            method = 'PUT';
-        }
-
+        let img = editingBanner?.image||"", vid=editingBanner?.videoUrl||"";
+        if(bannerFiles.image) img = await uploadToCloudinary(bannerFiles.image, 'image');
+        if(bannerFiles.video) vid = await uploadToCloudinary(bannerFiles.video, 'video');
+        const payload = { ...bannerForm, image:img, videoUrl:vid };
+        let url = `${API_URL}/api/admin/carousel/add-direct`, method = 'POST';
+        if(editingBanner){ url = `${API_URL}/api/admin/carousel/update-direct/${editingBanner.id}`; method='PUT'; }
         const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-        
-        if(res.ok) { 
-            alert("✅ Banner Saved!"); 
-            setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' });
-            setBannerImageFile(null); setBannerVideoFile(null); setEditingBanner(null);
-            setResetKey(Date.now());
-            fetchCarousel(); 
-        } else alert("Failed");
-      } catch(e) { alert("Error"); }
-      setUploading(false);
+        if(res.ok) { alert("Banner Saved!"); setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' }); setBannerFiles({ image: null, video: null }); setEditingBanner(null); setResetKey(Date.now()); fetchCarousel(); } else alert("Failed");
+      } catch(e) { alert("Error"); } setUploading(false);
   };
 
+  const handleGenreToggle = (g) => { selectedGenres.includes(g) ? setSelectedGenres(selectedGenres.filter(i=>i!==g)) : setSelectedGenres([...selectedGenres, g]); };
+  const handleDelete = async (id) => { if(confirm("Delete?")) { await fetch(`${API_URL}/api/admin/delete/${id}`, {method:'DELETE'}); fetchAll(); } };
+  const handleDeleteBanner = async (id) => { if(confirm("Delete?")) { await fetch(`${API_URL}/api/admin/carousel/delete/${id}`, {method:'DELETE'}); fetchCarousel(); } };
   const startEditBanner = (item) => { setEditingBanner(item); setBannerForm({ title: item.title||"", description: item.description||"", tag: item.tag||"", videoUrl: item.videoUrl||"" }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelEditBanner = () => { setEditingBanner(null); setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' }); setResetKey(Date.now()); };
-  const handleDeleteBanner = async (id) => { if(!confirm("Delete?")) return; await fetch(`${API_URL}/api/admin/carousel/delete/${id}`, {method:'DELETE'}); fetchCarousel(); };
   
   const handleUpdateDetails = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('title', editingItem.title); formData.append('description', editingItem.description); formData.append('year', editingItem.year); formData.append('cast', editingItem.cast); const fileInput = document.getElementById('editImageInput'); if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]); await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData }); alert("Updated!"); setResetKey(Date.now()); setUploading(false); fetchAll(); };
- // 👇 UPDATED: Direct Upload for Episodes
- const handleAddEpisode = async (e) => {
-    e.preventDefault(); 
-    setUploading(true);
-    setUploadProgress("Uploading Episode Video to Cloud..."); // Visual feedback
-
-    try {
-        const fileInput = document.getElementById('episodeVideoInput');
-        const file = fileInput?.files[0];
-
-        if (!file) { 
-            alert("Please select a video file"); 
-            setUploading(false); 
-            return; 
-        }
-
-        // 1. Upload Video to Cloudinary DIRECTLY (Bypasses Server Limit)
-        const vidUrl = await uploadToCloudinary(file, 'video');
-
-        // 2. Prepare Data (Send URL, not file)
-        const payload = { 
-            contentId: editingItem.id, 
-            seasonName: episodeForm.seasonName, 
-            title: episodeForm.title, 
-            duration: episodeForm.duration, 
-            videoUrl: vidUrl 
-        };
-
-        setUploadProgress("Saving Details...");
-        
-        // 3. Send to Backend (New Route)
-        const res = await fetch(`${API_URL}/api/admin/add-episode-direct`, { 
-            method: 'POST', 
-            headers: {'Content-Type':'application/json'}, 
-            body: JSON.stringify(payload) 
-        });
-
-        if(res.ok) { 
-            // 👇 The specific message you asked for
-            alert("✅ Upload Episode Successfully!"); 
-            
-            setResetKey(Date.now()); // Clear input
-            setEpisodeForm({ seasonName: 'Season 1', title: '', duration: '' }); // Reset text inputs
-            
-            // Refresh data
-            fetchAll(); 
-        } else {
-            alert("Failed to save episode details to database.");
-        }
-    } catch(e){ 
-        console.error(e); 
-        alert("Error uploading episode: " + e.message); 
-    } 
-    
-    setUploading(false); 
-    setUploadProgress("");
-};
+  
+  const handleAddEpisode = async (e) => { 
+      e.preventDefault(); setUploading(true); setUploadProgress("Uploading Episode...");
+      try {
+          const fileInput = document.getElementById('episodeVideoInput');
+          if (!fileInput.files[0]) { alert("Select Video"); setUploading(false); return; }
+          const vidUrl = await uploadToCloudinary(fileInput.files[0], 'video');
+          const payload = { contentId: editingItem.id, seasonName: episodeForm.seasonName, title: episodeForm.title, duration: episodeForm.duration, videoUrl: vidUrl };
+          const res = await fetch(`${API_URL}/api/admin/add-episode-direct`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          if(res.ok) { 
+              const updatedData = await res.json(); 
+              alert("Episode Added!"); 
+              setEditingItem({ ...editingItem, seasons: updatedData.seasons }); // Refresh list
+              setResetKey(Date.now()); 
+              fetchAll(); 
+          }
+      } catch(e){ alert(e.message); } 
+      setUploading(false); 
+  };
   
   const handleUpdateSeasonPoster = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('contentId', editingItem.id); formData.append('seasonName', seasonPosterForm.seasonName); const fileInput = document.getElementById('seasonPosterInput'); if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; } const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData }); if(res.ok) { alert("Poster Updated!"); setResetKey(Date.now()); fetchAll(); } setUploading(false); };
 
@@ -265,80 +192,40 @@ const AdminPage = () => {
                 <div style={formContainerStyle}>
                     <h2 style={{ marginBottom: '20px', textAlign: 'center', borderBottom: '1px solid #333', paddingBottom: '15px' }}>Upload Content</h2>
                     <form onSubmit={handleAddSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <div style={{display:'flex', gap:'10px'}}>
-                            <div style={{flex:1}}><label>Category</label><select value={addFormData.category} onChange={(e) => setAddFormData({...addFormData, category: e.target.value})} style={inputStyle}><option value="movie">Movie</option><option value="series">Web Series</option><option value="anime">Anime</option></select></div>
-                            <div style={{flex:1}}><label>Rating</label><input type="number" step="0.1" min="0" max="10" value={addFormData.rating} onChange={(e) => setAddFormData({...addFormData, rating: e.target.value})} required style={inputStyle} /></div>
-                        </div>
+                        {/* ... (Existing Inputs) ... */}
+                        <div style={{display:'flex', gap:'10px'}}><div style={{flex:1}}><label>Category</label><select value={addFormData.category} onChange={(e) => setAddFormData({...addFormData, category: e.target.value})} style={inputStyle}><option value="movie">Movie</option><option value="series">Web Series</option><option value="anime">Anime</option></select></div><div style={{flex:1}}><label>Rating</label><input type="number" step="0.1" min="0" max="10" value={addFormData.rating} onChange={(e) => setAddFormData({...addFormData, rating: e.target.value})} required style={inputStyle} /></div></div>
                         <input type="text" placeholder="Title" value={addFormData.title} onChange={(e) => setAddFormData({...addFormData, title: e.target.value})} required style={inputStyle} />
-                        <div style={{display:'flex', gap:'10px'}}>
-                            <div style={{flex:1}}><label>Year</label><input type="text" placeholder="e.g. 2024" value={addFormData.year} onChange={(e) => setAddFormData({...addFormData, year: e.target.value})} style={inputStyle} /></div>
-                            <div style={{flex:2}}><label>Cast</label><input type="text" placeholder="Names..." value={addFormData.cast} onChange={(e) => setAddFormData({...addFormData, cast: e.target.value})} style={inputStyle} /></div>
-                        </div>
+                        <div style={{display:'flex', gap:'10px'}}><div style={{flex:1}}><label>Year</label><input type="text" placeholder="e.g. 2024" value={addFormData.year} onChange={(e) => setAddFormData({...addFormData, year: e.target.value})} style={inputStyle} /></div><div style={{flex:2}}><label>Cast</label><input type="text" placeholder="Names..." value={addFormData.cast} onChange={(e) => setAddFormData({...addFormData, cast: e.target.value})} style={inputStyle} /></div></div>
                         <textarea placeholder="Description" value={addFormData.description} onChange={(e) => setAddFormData({...addFormData, description: e.target.value})} required rows="3" style={inputStyle} />
-                        <label style={{color:'#aaa'}}>Genres</label>
-                        <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>{GENRES.map(g => (<span key={g} onClick={() => handleGenreToggle(g)} style={{ padding:'5px 10px', borderRadius:'15px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #555', background: selectedGenres.includes(g) ? '#e50914' : 'transparent' }}>{g}</span>))}</div>
+                        <label style={{color:'#aaa'}}>Genres</label><div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>{GENRES.map(g=><span key={g} onClick={()=>handleGenreToggle(g)} style={{padding:'5px', border:'1px solid #555', borderRadius:'10px', cursor:'pointer', background:selectedGenres.includes(g)?'#e50914':'transparent'}}>{g}</span>)}</div>
                         <div style={{display:'flex', alignItems:'center', gap:'10px', background:'#333', padding:'10px', borderRadius:'4px'}}><input type="checkbox" checked={addFormData.featured} onChange={(e) => setAddFormData({...addFormData, featured: e.target.checked})} /><label>Add to Hero Carousel (Featured)</label></div>
                         <div style={fileBoxStyle}><label>Poster Image</label><input key={resetKey} type="file" accept="image/*" onChange={(e) => setFiles({...files, image: e.target.files[0]})} required style={{color:'#fff'}} /></div>
                         <div style={fileBoxStyle}><label>Trailer (Optional)</label><input key={resetKey} type="file" accept="video/*" onChange={(e) => setFiles({...files, trailer: e.target.files[0]})} style={{color:'#fff'}} /></div>
                         {addFormData.category === 'movie' && <div style={fileBoxStyle}><label>Full Movie File</label><input key={resetKey} type="file" accept="video/*" onChange={(e) => setFiles({...files, video: e.target.files[0]})} required style={{color:'#fff'}} /></div>}
-                        <button type="submit" className="btn btn-red" disabled={uploading} style={{ marginTop: '10px', padding: '15px', opacity: uploading ? 0.7 : 1 }}>
-                            {uploading ? uploadProgress : "Upload Content"}
-                        </button>
+                        <button type="submit" className="btn btn-red" disabled={uploading} style={{ marginTop: '10px', padding: '15px', opacity: uploading ? 0.7 : 1 }}>{uploading ? uploadProgress : "Upload Content"}</button>
                     </form>
                 </div>
             )}
 
             {activeTab === 'banners' && (
-                <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, background: '#1f1f1f', padding: '30px', borderRadius: '10px', border: '1px solid #333' }}>
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}>
-                            <h3>{editingBanner ? "Edit Banner" : "Add Hero Banner"}</h3>
-                            {editingBanner && <button onClick={cancelEditBanner} style={{background:'transparent', border:'none', color:'#aaa', cursor:'pointer'}}><FaTimes /> Cancel</button>}
-                        </div>
-                        <form onSubmit={handleBannerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop:'15px' }}>
-                            <input type="text" placeholder="Title" value={bannerForm.title} onChange={e=>setBannerForm({...bannerForm, title:e.target.value})} style={inputStyle} required />
-                            <input type="text" placeholder="Tag" value={bannerForm.tag} onChange={e=>setBannerForm({...bannerForm, tag:e.target.value})} style={inputStyle} />
-                            <textarea placeholder="Description" value={bannerForm.description} onChange={e=>setBannerForm({...bannerForm, description:e.target.value})} style={inputStyle} required />
-                            <div style={fileBoxStyle}><label>Wallpaper</label><input key={resetKey} type="file" accept="image/*" onChange={e=>setBannerImageFile(e.target.files[0])} style={{color:'#fff'}} /></div>
-                            <div style={fileBoxStyle}><label>Video</label><input key={resetKey} type="file" accept="video/*" onChange={e=>setBannerVideoFile(e.target.files[0])} style={{color:'#fff'}} /></div>
-                            <button type="submit" className="btn btn-red" disabled={uploading}>{uploading ? uploadProgress : editingBanner ? "Update Banner" : "Add Banner"}</button>
-                        </form>
+                <div style={formContainerStyle}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}>
+                        <h3>{editingBanner ? "Edit Banner" : "Add Hero Banner"}</h3>
+                        {editingBanner && <button onClick={cancelEditBanner} style={{background:'transparent', border:'none', color:'#aaa', cursor:'pointer'}}><FaTimes /> Cancel</button>}
                     </div>
-                    <div style={{ flex: 1.5 }}>
-                        <h3>Active Banners</h3>
-                        <div style={{ display:'grid', gap:'15px', marginTop:'15px' }}>
-                            {carouselList.map(item => (
-                                <div key={item.id} style={{ background: '#1f1f1f', border: '1px solid #333', borderRadius: '8px', overflow:'hidden', position:'relative' }}>
-                                    <img src={item.image} style={{ width:'100%', height:'150px', objectFit:'cover' }} alt="" />
-                                    <div style={{ padding:'15px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                                        <div><h4 style={{margin:0}}>{item.title}</h4><span style={{fontSize:'0.8rem', color:'#aaa'}}>{item.tag}</span></div>
-                                        <div style={{display:'flex', gap:'10px'}}>
-                                            <button onClick={() => startEditBanner(item)} style={{ background:'#444', border:'none', color:'white', padding:'8px', borderRadius:'4px', cursor:'pointer' }}><FaEdit /></button>
-                                            <button onClick={() => handleDeleteBanner(item.id)} style={{ background:'#e50914', border:'none', color:'white', padding:'8px', borderRadius:'4px', cursor:'pointer' }}><FaTrash /></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <form onSubmit={handleBannerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop:'15px' }}>
+                        <input type="text" placeholder="Title" value={bannerForm.title} onChange={e=>setBannerForm({...bannerForm, title:e.target.value})} style={inputStyle} required />
+                        <input type="text" placeholder="Tag" value={bannerForm.tag} onChange={e=>setBannerForm({...bannerForm, tag:e.target.value})} style={inputStyle} />
+                        <textarea placeholder="Description" value={bannerForm.description} onChange={e=>setBannerForm({...bannerForm, description:e.target.value})} style={inputStyle} required />
+                        <div style={fileBoxStyle}><label>Wallpaper</label><input key={resetKey} type="file" accept="image/*" onChange={e=>setBannerImageFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
+                        <div style={fileBoxStyle}><label>Video</label><input key={resetKey} type="file" accept="video/*" onChange={e=>setBannerVideoFile(e.target.files[0])} style={{color:'#fff'}} required={!editingBanner} /></div>
+                        <button type="submit" className="btn btn-red" disabled={uploading}>{uploading ? uploadProgress : "Save Banner"}</button>
+                    </form>
+                    <div style={{marginTop:'30px'}}>{carouselList.map(item => (<div key={item.id} style={{borderBottom:'1px solid #333', padding:'10px', display:'flex', justifyContent:'space-between'}}><p>{item.title}</p><button onClick={()=>handleDeleteBanner(item.id)} style={{color:'red', background:'transparent', border:'none', cursor:'pointer'}}><FaTrash/></button></div>))}</div>
                 </div>
             )}
 
-            {activeTab === 'analytics' && (
-                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                    <h2 style={{textAlign:'center', marginBottom:'30px'}}>Top 5 Most Watched</h2>
-                    <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
-                        {analytics.map((item, index) => (
-                            <div key={item.id} style={{display:'flex', alignItems:'center', background:'#222', padding:'15px', borderRadius:'8px', borderBottom:`4px solid ${index===0?'#e50914':'#333'}`}}>
-                                <span style={{fontSize:'1.5rem', fontWeight:'bold', width:'40px', color:'#777'}}>#{index+1}</span>
-                                <img src={item.image} style={{width:'50px', height:'75px', objectFit:'cover', borderRadius:'4px', marginRight:'20px'}} alt=""/>
-                                <div style={{flex:1}}><h3 style={{margin:0}}>{item.title}</h3><p style={{color:'#aaa', fontSize:'0.9rem', margin:'5px 0 0 0'}}>{item.category?.toUpperCase()}</p></div>
-                                <div style={{textAlign:'right'}}><span style={{fontSize:'1.5rem', fontWeight:'bold', color:'#fff'}}>{item.views || 0}</span><p style={{margin:0, fontSize:'0.8rem', color:'#aaa'}}>Views</p></div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {activeTab === 'analytics' && (<div style={{ maxWidth: '800px', margin: '0 auto' }}> <h2 style={{textAlign:'center'}}>Top 5 Most Watched</h2> {analytics.map((item, index) => ( <div key={item.id} style={{display:'flex', alignItems:'center', background:'#222', padding:'15px', borderRadius:'8px', borderBottom:`4px solid ${index===0?'#e50914':'#333'}`, marginTop:'10px'}}> <span style={{fontSize:'1.5rem', fontWeight:'bold', width:'40px', color:'#777'}}>#{index+1}</span> <img src={item.image} style={{width:'50px', height:'75px', objectFit:'cover', borderRadius:'4px', marginRight:'20px'}} alt=""/> <div style={{flex:1}}><h3 style={{margin:0}}>{item.title}</h3><p style={{color:'#aaa', fontSize:'0.9rem', margin:'0'}}>{item.category?.toUpperCase()}</p></div> <div><span style={{fontSize:'1.5rem', fontWeight:'bold', color:'#fff'}}>{item.views || 0}</span></div> </div> ))} </div> )}
 
             {editingItem && (
                 <div>
@@ -355,8 +242,30 @@ const AdminPage = () => {
                                 <button type="submit" className="btn btn-red" disabled={uploading}>{uploading ? "Updating..." : "Save Changes"}</button>
                             </form>
                         </div>
+                        
                         {editingItem.category !== 'movie' && (
                             <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                
+                                {/* 👇 RESTORED THE "MANAGE EPISODES" LIST HERE */}
+                                <div style={{ background: '#1f1f1f', padding: '30px', borderRadius: '10px', border: '1px solid #333', maxHeight:'400px', overflowY:'auto' }}>
+                                    <h3>Manage Episodes</h3>
+                                    {editingItem.seasons?.map(s => (
+                                        <div key={s.name} style={{ marginBottom: '20px' }}>
+                                            <h4 style={{borderBottom:'1px solid #444', paddingBottom:'5px', color:'#aaa'}}>{s.name}</h4>
+                                            {s.episodes.length === 0 ? <p style={{fontSize:'0.8rem', color:'#555'}}>No episodes</p> : (
+                                                <ul style={{listStyle:'none', padding:0}}>
+                                                    {s.episodes.map(ep => (
+                                                        <li key={ep.title} style={{display:'flex', justifyContent:'space-between', padding:'10px', background:'#2a2a2a', marginTop:'5px', borderRadius:'4px', alignItems:'center'}}>
+                                                            <span>{ep.title} <small style={{color:'#777'}}>({ep.duration})</small></span>
+                                                            <button onClick={() => handleDeleteEpisode(s.name, ep.title)} style={{background:'transparent', border:'none', color:'#e50914', cursor:'pointer'}} title="Delete Episode"><FaTrash /></button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
                                 <div style={{ background: '#1f1f1f', padding: '30px', borderRadius: '10px', border: '1px solid #333' }}>
                                     <h3>Push New Episode</h3>
                                     <form onSubmit={handleAddEpisode} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>

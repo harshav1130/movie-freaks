@@ -7,7 +7,7 @@ const GENRES = ["Action", "Sci-Fi", "Drama", "Comedy", "Horror", "Thriller", "Ro
 
 // 👇 REPLACE WITH YOUR CLOUDINARY KEYS
 const CLOUD_NAME = "djlfj4upe"; 
-const UPLOAD_PRESET = "YOUR_UNSIGNED_PRESET_NAME"; // 👈 PASTE YOUR PRESET NAME HERE
+const UPLOAD_PRESET = "UPLOAD_PRESET"; // 👈 PASTE YOUR PRESET NAME HERE
 
 const AdminPage = () => {
   const navigate = useNavigate();

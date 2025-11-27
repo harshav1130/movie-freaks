@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { API_URL } from './config'; 
 
@@ -212,6 +214,7 @@ const App = () => {
   // --- MAIN APP ---
   return (
     <div id="app-content" style={{ opacity: 1, width: '100%' }}>
+      <ToastContainer position="top-center" autoClose={3000} theme="dark" />
       <Routes>
           <Route path="/" element={
             <>

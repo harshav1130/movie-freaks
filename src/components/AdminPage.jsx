@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaEdit, FaPlus, FaSearch, FaUpload, FaImage, FaArrowLeft, FaTrash, FaStar, FaChartBar, FaTimes } from 'react-icons/fa';
 import { API_URL } from '../config';
+import { toast } from 'react-toastify';
 
 const GENRES = ["Action", "Sci-Fi", "Drama", "Comedy", "Horror", "Thriller", "Romance", "Animation", "Fantasy", "Adventure"];
 
@@ -64,7 +65,7 @@ const AdminPage = () => {
           if (data.error) throw new Error(data.error.message);
           return data.secure_url;
       } catch (error) {
-          alert(`Upload Failed: ${error.message}`); throw error;
+        toast.error(`Upload Failed: ${error.message}`); throw error;
       }
   };
 
@@ -85,7 +86,7 @@ const AdminPage = () => {
           });
           if (res.ok) {
               const data = await res.json();
-              alert("Episode Deleted!");
+              toast.info("Episode Deleted");
               setEditingItem({ ...editingItem, seasons: data.seasons }); // Update UI immediately
               fetchAll();
           } else { alert("Failed to delete episode."); }
@@ -101,7 +102,7 @@ const AdminPage = () => {
         const trailerUrl = files.trailer ? await uploadToCloudinary(files.trailer, 'video') : videoUrl;
         const payload = { ...addFormData, genres: JSON.stringify(selectedGenres), image: imageUrl, videoUrl: videoUrl, trailerUrl: trailerUrl };
         const res = await fetch(`${API_URL}/api/admin/add-direct`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (res.ok) { alert("✅ Content Uploaded!"); setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false }); setSelectedGenres([]); setFiles({ image: null, video: null, trailer: null }); setResetKey(Date.now()); fetchAll(); setActiveTab('manage'); } else alert("Backend failed.");
+        if (res.ok) { toast.success("✅ Content Uploaded Successfully!"); setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false }); setSelectedGenres([]); setFiles({ image: null, video: null, trailer: null }); setResetKey(Date.now()); fetchAll(); setActiveTab('manage'); } else alert("Backend failed.");
     } catch (err) { alert("Error"); } finally { setUploading(false); setUploadProgress(""); }
   };
 
@@ -115,7 +116,7 @@ const AdminPage = () => {
         let url = `${API_URL}/api/admin/carousel/add-direct`, method = 'POST';
         if(editingBanner){ url = `${API_URL}/api/admin/carousel/update-direct/${editingBanner.id}`; method='PUT'; }
         const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-        if(res.ok) { alert("Banner Saved!"); setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' }); setBannerFiles({ image: null, video: null }); setEditingBanner(null); setResetKey(Date.now()); fetchCarousel(); } else alert("Failed");
+        if(res.ok) { toast.success(editingBanner ? "✅ Banner Updated!" : "✅ Banner Added!"); setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' }); setBannerFiles({ image: null, video: null }); setEditingBanner(null); setResetKey(Date.now()); fetchCarousel(); } else alert("Failed");
       } catch(e) { alert("Error"); } setUploading(false);
   };
 
@@ -153,7 +154,7 @@ const AdminPage = () => {
         });
 
         if (res.ok) {
-            alert("✅ Details Updated!");
+            toast.success("Details Updated!");
             setResetKey(Date.now()); // Clear inputs
             fetchAll(); 
         } else {
@@ -173,7 +174,7 @@ const AdminPage = () => {
           const res = await fetch(`${API_URL}/api/admin/add-episode-direct`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
           if(res.ok) { 
               const updatedData = await res.json(); 
-              alert("Episode Added!"); 
+              toast.success("✅ Episode Added!"); 
               setEditingItem({ ...editingItem, seasons: updatedData.seasons }); // Refresh list
               setResetKey(Date.now()); 
               fetchAll(); 
@@ -211,7 +212,7 @@ const AdminPage = () => {
         });
 
         if(res.ok) { 
-            alert("✅ Season Poster Updated!"); 
+            toast.success("✅ Season Poster Updated!"); 
             setResetKey(Date.now());
             
             // Refresh the specific item to show new poster

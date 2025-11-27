@@ -150,6 +150,34 @@ app.post('/api/admin/carousel/add-direct', async (req, res) => {
         res.json({ message: "Banner Saved!" });
     } catch (e) { res.status(500).json({ error: "Failed" }); }
 });
+
+app.post('/api/content/view/:id', async (req, res) => {
+    try {
+        // Convert string ID from URL to Number
+        const id = parseInt(req.params.id);
+        
+        if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+
+        // Find in any collection
+        let item = await MovieModel.findOne({ id }) || 
+                   await SeriesModel.findOne({ id }) || 
+                   await AnimeModel.findOne({ id });
+
+        if (item) {
+            item.views = (item.views || 0) + 1;
+            await item.save();
+            console.log(`👁️ View counted for: ${item.title} (Total: ${item.views})`);
+            res.json({ views: item.views });
+        } else {
+            console.log("❌ Item not found for view count:", id);
+            res.status(404).json({ error: "Item not found" });
+        }
+    } catch (e) { 
+        console.error("View Count Error:", e);
+        res.status(500).json({ error: "Error" }); 
+    }
+});
+
 app.post('/api/auth/login', async (req, res) => { const { email, password } = req.body; const user = await User.findOne({ email }); if (!user || user.password !== password) return res.status(401).json({ message: 'Invalid credentials' }); res.json({ message: 'Success', user }); });
 app.post('/api/auth/signup', async (req, res) => { const { email, password } = req.body; const newUser = new User({ email, password, username: email.split('@')[0] }); await newUser.save(); res.status(201).json({ message: 'Created', user: { email } }); });
 app.get('/api/user/:email', async (req, res) => { const user = await User.findOne({ email: req.params.email }); res.json(user || {}); });

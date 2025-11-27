@@ -87,36 +87,46 @@ const AdminPage = () => {
 
   // 1. Add/Update Content
   const handleAddSubmit = async (e) => {
-    e.preventDefault(); setUploading(true); setUploadProgress("Processing...");
+    e.preventDefault(); setUploading(true);
+    const data = new FormData();
+    Object.keys(addFormData).forEach(key => data.append(key, addFormData[key]));
+    data.append('genres', JSON.stringify(selectedGenres));
+    if (files.image) data.append('imageFile', files.image);
+    if (files.video) data.append('videoFile', files.video);
+    if (files.trailer) data.append('trailerFile', files.trailer);
 
     try {
-        setUploadProgress("Uploading Image...");
-        const imageUrl = files.image ? await uploadToCloudinary(files.image, 'image') : "";
-        setUploadProgress("Uploading Video...");
-        const videoUrl = files.video ? await uploadToCloudinary(files.video, 'video') : "";
-        const trailerUrl = files.trailer ? await uploadToCloudinary(files.trailer, 'video') : videoUrl;
-
-        const payload = {
-            ...addFormData,
-            genres: JSON.stringify(selectedGenres),
-            image: imageUrl,
-            videoUrl: videoUrl,
-            trailerUrl: trailerUrl
-        };
-
-        setUploadProgress("Saving...");
-        const res = await fetch(`${API_URL}/api/admin/add-direct`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-
+        const res = await fetch(`${API_URL}/api/admin/add`, { method: 'POST', body: data });
         if (res.ok) {
-            alert("✅ Content Uploaded!");
+            alert("✅ Content Uploaded! Redirecting to Manage...");
+            
+            // 1. Clear Form
             setAddFormData({ title: '', description: '', rating: '', category: 'movie', year: '', cast: '', featured: false });
             setSelectedGenres([]); setFiles({ image: null, video: null, trailer: null });
-            setResetKey(Date.now());
-            fetchAll(); setActiveTab('manage');
-        } else alert("Backend failed to save.");
-    } catch (err) { alert("Error during upload."); } finally { setUploading(false); setUploadProgress(""); }
-  };
+            document.querySelectorAll('input[type="file"]').forEach(i => i.value = '');
 
+            // 2. Refresh List & Find New Item
+            // We fetch again to get the latest data including the one just added
+            const [m, s, a] = await Promise.all([
+                fetch(`${API_URL}/api/movies`).then(r => r.json()),
+                fetch(`${API_URL}/api/series`).then(r => r.json()),
+                fetch(`${API_URL}/api/anime`).then(r => r.json())
+            ]);
+            
+            const allItems = [...(m||[]), ...(s||[]), ...(a||[])];
+            setContentList(allItems);
+            
+            // Find the item we just added (by title)
+            // Note: In a real app, the API should return the new ID, but this works for now
+            const newItem = allItems.find(i => i.title === data.get('title'));
+
+            // 3. Switch Tab & Open Edit Mode
+            setActiveTab('manage');
+            if (newItem) setEditingItem(newItem);
+            
+        } else alert("Failed to upload.");
+    } catch (err) { alert("Error"); } finally { setUploading(false); }
+  };
   // 2. Add/Update Banner
   const handleBannerSubmit = async (e) => {
     e.preventDefault(); 

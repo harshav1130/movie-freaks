@@ -125,8 +125,44 @@ const AdminPage = () => {
   const startEditBanner = (item) => { setEditingBanner(item); setBannerForm({ title: item.title||"", description: item.description||"", tag: item.tag||"", videoUrl: item.videoUrl||"" }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelEditBanner = () => { setEditingBanner(null); setBannerForm({ title: '', description: '', tag: 'Featured', videoUrl: '' }); setResetKey(Date.now()); };
   
-  const handleUpdateDetails = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('title', editingItem.title); formData.append('description', editingItem.description); formData.append('year', editingItem.year); formData.append('cast', editingItem.cast); const fileInput = document.getElementById('editImageInput'); if(fileInput.files[0]) formData.append('imageFile', fileInput.files[0]); await fetch(`${API_URL}/api/admin/update/${editingItem.id}`, { method: 'PUT', body: formData }); alert("Updated!"); setResetKey(Date.now()); setUploading(false); fetchAll(); };
-  
+  const handleUpdateDetails = async (e) => {
+    e.preventDefault(); 
+    setUploading(true);
+    
+    try {
+        let imageUrl = editingItem.image; // Default to existing image
+        
+        const fileInput = document.getElementById('editImageInput');
+        if (fileInput?.files[0]) {
+            // Upload new image if selected
+            imageUrl = await uploadToCloudinary(fileInput.files[0], 'image');
+        }
+
+        const payload = {
+            title: editingItem.title,
+            description: editingItem.description,
+            year: editingItem.year,
+            cast: editingItem.cast,
+            image: imageUrl // Send the new (or old) URL
+        };
+
+        const res = await fetch(`${API_URL}/api/admin/update-direct/${editingItem.id}`, { 
+            method: 'PUT', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+
+        if (res.ok) {
+            alert("✅ Details Updated!");
+            setResetKey(Date.now()); // Clear inputs
+            fetchAll(); 
+        } else {
+            alert("Update Failed.");
+        }
+    } catch (e) { console.error(e); alert("Error updating details"); }
+    
+    setUploading(false);
+};
   const handleAddEpisode = async (e) => { 
       e.preventDefault(); setUploading(true); setUploadProgress("Uploading Episode...");
       try {
@@ -146,8 +182,48 @@ const AdminPage = () => {
       setUploading(false); 
   };
   
-  const handleUpdateSeasonPoster = async (e) => { e.preventDefault(); setUploading(true); const formData = new FormData(); formData.append('contentId', editingItem.id); formData.append('seasonName', seasonPosterForm.seasonName); const fileInput = document.getElementById('seasonPosterInput'); if(fileInput.files[0]) formData.append('seasonImageFile', fileInput.files[0]); else { alert("Select image"); setUploading(false); return; } const res = await fetch(`${API_URL}/api/admin/update-season-poster`, { method: 'POST', body: formData }); if(res.ok) { alert("Poster Updated!"); setResetKey(Date.now()); fetchAll(); } setUploading(false); };
+  const handleUpdateSeasonPoster = async (e) => {
+    e.preventDefault(); 
+    setUploading(true);
+    
+    try {
+        const fileInput = document.getElementById('seasonPosterInput');
+        if (!fileInput.files[0]) { 
+            alert("Please select an image"); 
+            setUploading(false); 
+            return; 
+        }
 
+        // 1. Upload to Cloudinary
+        const imageUrl = await uploadToCloudinary(fileInput.files[0], 'image');
+
+        // 2. Send URL to Backend
+        const payload = {
+            contentId: editingItem.id,
+            seasonName: seasonPosterForm.seasonName,
+            image: imageUrl
+        };
+
+        const res = await fetch(`${API_URL}/api/admin/update-season-poster-direct`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+
+        if(res.ok) { 
+            alert("✅ Season Poster Updated!"); 
+            setResetKey(Date.now());
+            
+            // Refresh the specific item to show new poster
+            // (Or fetchAll to be safe)
+            fetchAll(); 
+        } else {
+            alert("Failed to update poster.");
+        }
+    } catch (e) { console.error(e); alert("Error updating poster"); }
+    
+    setUploading(false);
+}
   const filteredList = contentList.filter(i => i.title?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (

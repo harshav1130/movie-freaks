@@ -111,9 +111,46 @@ app.post('/api/admin/add', upload.fields([{ name: 'imageFile', maxCount: 1 }, { 
 app.post('/api/admin/add-episode', upload.single('videoFile'), async (req, res) => { try { const { contentId, seasonName, title, duration } = req.body; const videoUrl = req.file.path; const newEpisode = { title, duration, url: videoUrl }; let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId }); if (!item) return res.status(404).json({ error: "Not found" }); const seasonIndex = item.seasons.findIndex(s => s.name === seasonName); if (seasonIndex > -1) { item.seasons[seasonIndex].episodes.push(newEpisode); } else { item.seasons.push({ name: seasonName, image: item.image, episodes: [newEpisode] }); } item.markModified('seasons'); await item.save(); res.json({ message: "Episode Added!", seasons: item.seasons }); } catch (e) { res.status(500).json({ error: "Failed" }); } });
 app.post('/api/admin/carousel/add', upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'videoFile', maxCount: 1 }]), async (req, res) => { try { const data = req.body; data.id = Math.floor(Math.random() * 100000); if (req.files['imageFile']) data.image = req.files['imageFile'][0].path; if (req.files['videoFile']) data.videoUrl = req.files['videoFile'][0].path; await CarouselModel.create(data); res.json({ message: "Banner Added!" }); } catch (e) { res.status(500).json({ error: "Failed" }); } });
 app.put('/api/admin/carousel/update/:id', upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'videoFile', maxCount: 1 }]), async (req, res) => { try { const { id } = req.params; const updates = req.body; if (req.files['imageFile']) updates.image = req.files['imageFile'][0].path; if (req.files['videoFile']) updates.videoUrl = req.files['videoFile'][0].path; await CarouselModel.findOneAndUpdate({ id: id }, updates); res.json({ message: "Banner Updated!" }); } catch (e) { res.status(500).json({ error: "Update Failed" }); } });
-app.put('/api/admin/update/:id', upload.single('imageFile'), async (req, res) => { try { const { id } = req.params; const updates = req.body; if (req.file) updates.image = req.file.path; let updatedItem = await MovieModel.findOneAndUpdate({ id: id }, updates, { new: true }); if (!updatedItem) updatedItem = await SeriesModel.findOneAndUpdate({ id: id }, updates, { new: true }); if (!updatedItem) updatedItem = await AnimeModel.findOneAndUpdate({ id: id }, updates, { new: true }); res.json({ message: "Updated Successfully!", item: updatedItem }); } catch (e) { res.status(500).json({ error: "Update Failed" }); } });
-app.post('/api/admin/update-season-poster', upload.single('seasonImageFile'), async (req, res) => { try { const { contentId, seasonName } = req.body; const imageUrl = req.file.path; let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId }); const seasonIndex = item.seasons.findIndex(s => s.name === seasonName); if (seasonIndex > -1) { item.seasons[seasonIndex].image = imageUrl; item.markModified('seasons'); await item.save(); res.json({ message: "Poster Updated!" }); } } catch (e) { res.status(500).json({ error: "Failed" }); } });
+// 👇 NEW: DIRECT UPDATE DETAILS (Accepts Image URL)
+app.put('/api/admin/update-direct/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body; // { title, description, year, cast, image }
+        
+        let updatedItem = await MovieModel.findOneAndUpdate({ id: id }, updates, { new: true });
+        if (!updatedItem) updatedItem = await SeriesModel.findOneAndUpdate({ id: id }, updates, { new: true });
+        if (!updatedItem) updatedItem = await AnimeModel.findOneAndUpdate({ id: id }, updates, { new: true });
 
+        res.json({ message: "Updated Successfully!", item: updatedItem });
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: "Update Failed" }); 
+    }
+});
+
+// 👇 NEW: DIRECT SEASON POSTER UPDATE (Accepts Image URL)
+app.post('/api/admin/update-season-poster-direct', async (req, res) => {
+    try {
+        const { contentId, seasonName, image } = req.body;
+        
+        let item = await SeriesModel.findOne({ id: contentId }) || await AnimeModel.findOne({ id: contentId });
+        if (!item) return res.status(404).json({ error: "Content not found" });
+
+        const seasonIndex = item.seasons.findIndex(s => s.name === seasonName);
+        
+        if (seasonIndex > -1) {
+            item.seasons[seasonIndex].image = image; // Save the Cloudinary URL
+            item.markModified('seasons');
+            await item.save();
+            res.json({ message: "Poster Updated!" });
+        } else {
+            res.status(404).json({ error: "Season not found" });
+        }
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: "Failed to update poster" }); 
+    }
+});
 // 👇 NEW: DIRECT ADD ROUTE (Accepts URLs from Frontend)
 app.post('/api/admin/add-direct', async (req, res) => {
     try {
